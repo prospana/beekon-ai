@@ -1,5 +1,5 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { BarChart3, Globe, Search, Users, Settings, Zap } from 'lucide-react';
+import { NavLink, useLocation } from "react-router-dom";
+import { BarChart3, Globe, Search, Users, Settings, Zap } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -9,14 +9,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar";
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Websites', href: '/websites', icon: Globe },
-  { name: 'Analysis', href: '/analysis', icon: Search },
-  { name: 'Competitors', href: '/competitors', icon: Users },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+  { name: "Websites", href: "/websites", icon: Globe },
+  { name: "Analysis", href: "/analysis", icon: Search },
+  { name: "Competitors", href: "/competitors", icon: Users },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -45,8 +45,8 @@ export function AppSidebar() {
                       className={({ isActive }) =>
                         `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                           isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         }`
                       }
                     >

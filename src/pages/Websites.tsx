@@ -1,9 +1,15 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -12,79 +18,124 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
-import { Plus, Globe, MoreHorizontal, Settings, Trash2, BarChart3, Calendar } from 'lucide-react';
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Plus,
+  Globe,
+  MoreHorizontal,
+  Settings,
+  Trash2,
+  BarChart3,
+  Calendar,
+} from "lucide-react";
+import { sendN8nWebhook } from "@/lib/http-request";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Websites() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [domain, setDomain] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [domain, setDomain] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Mock data
   const websites = [
     {
       id: 1,
-      domain: 'example.com',
-      displayName: 'Example Corp',
-      status: 'active',
-      lastAnalyzed: '2024-01-07',
+      domain: "example.com",
+      displayName: "Example Corp",
+      status: "active",
+      lastAnalyzed: "2024-01-07",
       totalTopics: 12,
-      avgVisibility: 78
+      avgVisibility: 78,
     },
     {
       id: 2,
-      domain: 'mycompany.io',
-      displayName: 'My Company',
-      status: 'pending',
-      lastAnalyzed: '2024-01-05',
+      domain: "mycompany.io",
+      displayName: "My Company",
+      status: "pending",
+      lastAnalyzed: "2024-01-05",
       totalTopics: 8,
-      avgVisibility: 65
+      avgVisibility: 65,
     },
     {
       id: 3,
-      domain: 'startup.tech',
-      displayName: 'Tech Startup',
-      status: 'active',
-      lastAnalyzed: '2024-01-06',
+      domain: "startup.tech",
+      displayName: "Tech Startup",
+      status: "active",
+      lastAnalyzed: "2024-01-06",
       totalTopics: 15,
-      avgVisibility: 82
-    }
+      avgVisibility: 82,
+    },
   ];
 
-  const handleAddWebsite = () => {
+  // Add `https://` if it doesn't exists
+  const addProtocol = (domain: string) => {
+    if (!domain.includes("https://")) return "https://" + domain;
+    return domain;
+  };
+
+  const handleAddWebsite = async () => {
+    console.log("user", user);
     if (!domain) {
       toast({
-        title: 'Error',
-        description: 'Please enter a domain name',
-        variant: 'destructive',
+        title: "Error",
+        description: "Please enter a domain name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate domain format
+    const domainRegex =
+      /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+
+    if (!domainRegex.test(domain)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid domain name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const response = await sendN8nWebhook("webhook-test/website-onboarding", {
+      website: addProtocol(domain),
+      display_name: displayName,
+    });
+
+    if (!response.success) {
+      toast({
+        title: "Error",
+        description: "Please unable to crawl website.",
+        variant: "destructive",
       });
       return;
     }
 
     // Here you would typically make an API call to add the website
     toast({
-      title: 'Website added!',
+      title: "Website added!",
       description: `Analysis started for ${domain}`,
     });
 
-    setDomain('');
-    setDisplayName('');
-    setIsAddDialogOpen(false);
+    // setDomain("");
+    // setDisplayName("");
+    // setIsAddDialogOpen(false);
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
+      case "active":
         return <Badge className="bg-success">Active</Badge>;
-      case 'pending':
+      case "pending":
         return <Badge variant="secondary">Pending</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
@@ -100,7 +151,7 @@ export default function Websites() {
             Manage and monitor your websites for AI visibility
           </p>
         </div>
-        
+
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -120,7 +171,7 @@ export default function Websites() {
                 <Label htmlFor="domain">Domain</Label>
                 <Input
                   id="domain"
-                  placeholder="example.com"
+                  placeholder="https://www.example.com"
                   value={domain}
                   onChange={(e) => setDomain(e.target.value)}
                 />
@@ -136,7 +187,10 @@ export default function Websites() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button onClick={handleAddWebsite}>Start Analysis</Button>
@@ -173,7 +227,9 @@ export default function Websites() {
                     <Globe className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">{website.displayName || website.domain}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {website.displayName || website.domain}
+                    </CardTitle>
                     <CardDescription>{website.domain}</CardDescription>
                   </div>
                 </div>
@@ -218,14 +274,18 @@ export default function Websites() {
                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Total Topics</p>
-                    <p className="text-sm text-muted-foreground">{website.totalTopics}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {website.totalTopics}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-primary rounded-full" />
                   <div>
                     <p className="text-sm font-medium">Avg Visibility</p>
-                    <p className="text-sm text-muted-foreground">{website.avgVisibility}%</p>
+                    <p className="text-sm text-muted-foreground">
+                      {website.avgVisibility}%
+                    </p>
                   </div>
                 </div>
               </div>
