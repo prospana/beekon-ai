@@ -93,6 +93,15 @@ export default function Websites() {
       return;
     }
 
+    if (!displayName) {
+      toast({
+        title: "Error",
+        description: "Please enter a display name",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate domain format
     const domainRegex =
       /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
@@ -106,7 +115,7 @@ export default function Websites() {
       return;
     }
 
-    const response = await sendN8nWebhook("webhook-test/website-onboarding", {
+    const response = await sendN8nWebhook("webhook/website-onboarding", {
       website: addProtocol(domain),
       display_name: displayName,
     });
@@ -114,7 +123,7 @@ export default function Websites() {
     if (!response.success) {
       toast({
         title: "Error",
-        description: "Please unable to crawl website.",
+        description: "Website crawl failed. Ensure the site is accessible.",
         variant: "destructive",
       });
       return;
