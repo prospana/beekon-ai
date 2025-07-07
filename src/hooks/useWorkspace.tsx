@@ -7,10 +7,13 @@ interface WorkspaceContextType {
   workspace: Database["beekon_data"]["Tables"]["workspaces"]["Row"] | null;
 }
 
-const WorkspaceContext = createContext(WorkspaceContextType | undefined);
+const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
+  undefined
+);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspace, setWorkspace] = useState<WorkspaceContextType | null>(null);
+
   return (
     <WorkspaceContext.Provider value={null}>
       {children}
