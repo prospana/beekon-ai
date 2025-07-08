@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Card,
   CardContent,
@@ -8,9 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -26,23 +23,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
 import { useToast } from "@/hooks/use-toast";
-import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { sendN8nWebhook } from "@/lib/http-request";
+import type { Website } from "@/types/website";
 import {
-  Plus,
-  Globe,
-  MoreHorizontal,
-  Settings,
-  Trash2,
   BarChart3,
   Calendar,
+  Globe,
+  MoreHorizontal,
   Play,
+  Plus,
+  Settings,
+  Trash2,
 } from "lucide-react";
-import { sendN8nWebhook } from "@/lib/http-request";
-import { useAuth } from "@/hooks/useAuth";
-import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
-import type { Website } from "@/types/website";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 
 export default function Websites() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -55,7 +55,7 @@ export default function Websites() {
   const [websiteToDelete, setWebsiteToDelete] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
-  const { workspaceId, user } = useAuth();
+  const { workspaceId } = useAuth();
 
   // Mock data with state for dynamic updates
   const [websites, setWebsites] = useState<Website[] | []>([]);
@@ -183,7 +183,7 @@ export default function Websites() {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      setWebsites((prev) => prev.filter((site) => site.id !== websiteId));
+      setWebsites((prev) => prev.filter((site) => site?.id !== websiteId));
 
       toast({
         title: "Website deleted",

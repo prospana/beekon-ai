@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,19 +8,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 import { useWorkspace, type Workspace } from "@/contexts/WorkspaceContext";
-import { WorkspaceModal } from "./WorkspaceModal";
-import { ConfirmationDialog } from "./ConfirmationDialog";
 import {
   Building,
   ChevronDown,
+  Loader2,
   Plus,
   Settings,
   Trash2,
-  Check,
-  Loader2,
 } from "lucide-react";
+import { useState } from "react";
+import { ConfirmationDialog } from "./ConfirmationDialog";
+import { WorkspaceModal } from "./WorkspaceModal";
 
 export function WorkspaceDropdown() {
   const {
@@ -102,10 +101,17 @@ export function WorkspaceDropdown() {
 
   if (!currentWorkspace) {
     return (
-      <Button variant="outline" size="sm" onClick={handleCreateWorkspace}>
-        <Plus className="h-4 w-4 mr-2" />
-        Create Workspace
-      </Button>
+      <>
+        <Button variant="outline" size="sm" onClick={handleCreateWorkspace}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Workspace
+        </Button>
+        <WorkspaceModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          workspace={editingWorkspace}
+        />
+      </>
     );
   }
 
