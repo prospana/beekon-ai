@@ -6,10 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:host": "vite --host",
-    "debug": "vite --mode debug",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "build:debug": "vite build --mode debug",
     "build:analyze": "npm run build && npx vite-bundle-analyzer dist",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -22,11 +20,7 @@
     "clean": "rm -rf dist node_modules/.vite",
     "preview": "vite preview",
     "pre-commit": "npm run type-check && npm run lint:strict",
-    "ci": "npm run validate && npm run audit",
-    "debug:start": "npm run debug",
-    "debug:build": "npm run build:debug",
-    "debug:clean": "npm run clean && npm run debug",
-    "debug:full": "npm run clean && npm run type-check && npm run lint && npm run debug"
+    "ci": "npm run validate && npm run audit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -99,6 +93,6 @@
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.19"
   }
 }

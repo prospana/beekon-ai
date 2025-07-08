@@ -5,8 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const isDebug = mode === 'debug';
-  const isDevelopment = mode === 'development' || isDebug;
+  const isDevelopment = mode === 'development';
   
   return {
     server: {
@@ -20,9 +19,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react({
-        // Enable React Developer Tools in debug mode
-        devTarget: isDebug ? 'esnext' : 'es2015',
-        jsxImportSource: '@emotion/react',
+        devTarget: 'es2015',
       }),
       isDevelopment && componentTagger(),
     ].filter(Boolean),
@@ -33,19 +30,43 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: isDevelopment ? 'inline' : false,
-      minify: isDebug ? false : 'esbuild',
+      minify: 'esbuild',
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: isDevelopment ? undefined : {
+          manualChunks: {
             vendor: ['react', 'react-dom'],
-            ui: ['@radix-ui/react-accordion', '@radix-ui/react-alert-dialog'],
-            utils: ['clsx', 'tailwind-merge'],
+            radix: [
+              '@radix-ui/react-accordion', 
+              '@radix-ui/react-alert-dialog',
+              '@radix-ui/react-avatar',
+              '@radix-ui/react-checkbox',
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-dropdown-menu',
+              '@radix-ui/react-label',
+              '@radix-ui/react-navigation-menu',
+              '@radix-ui/react-popover',
+              '@radix-ui/react-progress',
+              '@radix-ui/react-radio-group',
+              '@radix-ui/react-scroll-area',
+              '@radix-ui/react-select',
+              '@radix-ui/react-separator',
+              '@radix-ui/react-slot',
+              '@radix-ui/react-switch',
+              '@radix-ui/react-tabs',
+              '@radix-ui/react-toast',
+              '@radix-ui/react-toggle',
+              '@radix-ui/react-tooltip'
+            ],
+            utils: ['clsx', 'tailwind-merge', 'class-variance-authority'],
+            forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+            supabase: ['@supabase/supabase-js'],
+            icons: ['lucide-react'],
           },
         },
       },
     },
     define: {
-      __DEBUG__: JSON.stringify(isDebug),
       __DEV__: JSON.stringify(isDevelopment),
       __PROD__: JSON.stringify(mode === 'production'),
     },

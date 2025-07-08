@@ -101,7 +101,6 @@ export function WebsiteSettingsModal({
 
   const onSubmit = (data: WebsiteSettingsFormData) => {
     // TODO: Implement API call to save settings
-    console.log("Saving website settings:", data);
     
     toast({
       title: "Settings saved",
