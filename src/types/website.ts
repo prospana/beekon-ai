@@ -30,7 +30,10 @@ export interface WebsiteCreateRequest {
   displayName?: string;
 }
 
-export interface WebsiteUpdateRequest extends Partial<Omit<Website, 'id' | 'createdAt' | 'updatedAt'>> {}
+export interface WebsiteUpdateRequest extends Partial<Omit<Website, 'id' | 'createdAt' | 'updatedAt'>> {
+  domain?: string;
+  displayName?: string;
+}
 
 export interface WebsiteAnalysisResult {
   id: number;

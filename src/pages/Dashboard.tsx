@@ -1,10 +1,17 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, BarChart3, Target, MessageSquare, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { useToast } from '@/hooks/use-toast';
+import { TrendingUp, TrendingDown, BarChart3, Target, MessageSquare, Zap, Download, RefreshCw, ExternalLink } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
+  const { toast } = useToast();
+  const [isExporting, setIsExporting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   // Mock data
   const visibilityData = [
     { date: '2024-01-01', visibility: 65 },
@@ -40,21 +47,97 @@ export default function Dashboard() {
     }
   };
 
+  const handleExportData = async (format: 'pdf' | 'csv') => {
+    setIsExporting(true);
+    try {
+      // Simulate export
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: 'Export successful',
+        description: `Dashboard data exported as ${format.toUpperCase()}`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Export failed',
+        description: 'Failed to export data. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      // Simulate data refresh
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      toast({
+        title: 'Data refreshed',
+        description: 'Dashboard data has been updated with the latest information.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Refresh failed',
+        description: 'Failed to refresh data. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+  
+  const handleMetricClick = (metricName: string) => {
+    toast({
+      title: `${metricName} Details`,
+      description: `View detailed breakdown for ${metricName}`,
+    });
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Monitor your brand's AI visibility performance
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Monitor your brand's AI visibility performance
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <LoadingButton
+            variant="outline"
+            size="sm"
+            loading={isRefreshing}
+            loadingText="Refreshing..."
+            onClick={handleRefreshData}
+            icon={<RefreshCw className="h-4 w-4" />}
+          >
+            Refresh
+          </LoadingButton>
+          <LoadingButton
+            variant="outline"
+            size="sm"
+            loading={isExporting}
+            loadingText="Exporting..."
+            onClick={() => handleExportData('pdf')}
+            icon={<Download className="h-4 w-4" />}
+          >
+            Export
+          </LoadingButton>
+        </div>
       </div>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleMetricClick('Overall Visibility Score')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Overall Visibility Score</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center space-x-1">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">78%</div>
@@ -65,10 +148,13 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleMetricClick('Average Rank')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Average Rank</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center space-x-1">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">2.8</div>
@@ -79,10 +165,13 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleMetricClick('Total Mentions')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Mentions</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center space-x-1">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">1,247</div>
@@ -93,10 +182,13 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleMetricClick('Sentiment Score')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Sentiment Score</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center space-x-1">
+              <Zap className="h-4 w-4 text-muted-foreground" />
+              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">84%</div>
@@ -111,10 +203,20 @@ export default function Dashboard() {
       {/* Visibility Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Visibility Over Time</CardTitle>
-          <CardDescription>
-            Your brand's visibility trend across all LLMs (last 7 days)
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Visibility Over Time</CardTitle>
+              <CardDescription>
+                Your brand's visibility trend across all LLMs (last 7 days)
+              </CardDescription>
+            </div>
+            <div className="flex space-x-2">
+              <Button variant="outline" size="sm" onClick={() => handleExportData('csv')}>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -144,10 +246,20 @@ export default function Dashboard() {
       {/* Performance by Topic */}
       <Card>
         <CardHeader>
-          <CardTitle>Performance by Topic</CardTitle>
-          <CardDescription>
-            How your brand performs across different topics and keywords
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Performance by Topic</CardTitle>
+              <CardDescription>
+                How your brand performs across different topics and keywords
+              </CardDescription>
+            </div>
+            <div className="flex space-x-2">
+              <Button variant="outline" size="sm" onClick={() => handleExportData('pdf')}>
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

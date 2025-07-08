@@ -3,24 +3,19 @@ import { createClient } from "@supabase/supabase-js";
 // import type { Database } from "./types";
 import type { Database } from "../supabase";
 
-const SUPABASE_URL = "https://apzyfnqlajvbgaejfzfm.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwenlmbnFsYWp2YmdhZWpmemZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0Mjg3MDAsImV4cCI6MjA2NzAwNDcwMH0.kot73DLrww9kXH5S0LycG9Bqj6v0MGgFA1tr3P_-L8U";
+const URL = import.meta.env.VITE_SUPABASE_URL!;
+const PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(
-  SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY,
-  {
-    auth: {
-      storage: localStorage,
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-    db: {
-      schema: "beekon_data",
-    },
-  }
-);
+export const supabase = createClient<Database>(URL, PUBLISHABLE_KEY, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  db: {
+    schema: "beekon_data",
+  },
+});

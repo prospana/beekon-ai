@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Card,
   CardContent,
@@ -26,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import {
   Plus,
   Globe,
@@ -34,6 +36,7 @@ import {
   Trash2,
   BarChart3,
   Calendar,
+  Play,
 } from "lucide-react";
 import { sendN8nWebhook } from "@/lib/http-request";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,11 +49,15 @@ export default function Websites() {
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [domain, setDomain] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [websiteToDelete, setWebsiteToDelete] = useState<number | null>(null);
+  const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
   const { workspaceId } = useAuth();
 
-  // Mock data
-  const websites: Website[] = [
+  // Mock data with state for dynamic updates
+  const [websites, setWebsites] = useState<Website[]>([
     {
       id: 1,
       domain: "example.com",
@@ -108,7 +115,7 @@ export default function Websites() {
       dataRetention: "365",
       exportEnabled: true,
     },
-  ];
+  ]);
 
   // Add `https://` if it doesn't exists
   const addProtocol = (domain: string) => {
@@ -117,7 +124,7 @@ export default function Websites() {
   };
 
   const handleAddWebsite = async () => {
-    console.log("workspaceId", workspaceId);
+    setProcessing(true);
     if (!domain) {
       toast({
         title: "Error",
@@ -172,6 +179,7 @@ export default function Websites() {
 
     setDomain("");
     setDisplayName("");
+    setProcessing(false);
     setIsAddDialogOpen(false);
   };
 
@@ -194,6 +202,53 @@ export default function Websites() {
   const handleCloseSettings = () => {
     setIsSettingsModalOpen(false);
     setSelectedWebsite(null);
+  };
+
+  const handleAnalyzeNow = async (websiteId: number) => {
+    setIsAnalyzing(websiteId);
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      toast({
+        title: "Analysis started",
+        description:
+          "Your website analysis has been queued and will begin shortly.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to start analysis. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(null);
+    }
+  };
+
+  const handleDeleteWebsite = async (websiteId: number) => {
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      setWebsites((prev) => prev.filter((site) => site.id !== websiteId));
+
+      toast({
+        title: "Website deleted",
+        description: "The website has been removed from monitoring.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete website. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmDelete = (websiteId: number) => {
+    setWebsiteToDelete(websiteId);
+    setShowDeleteConfirm(true);
   };
 
   return (
@@ -247,7 +302,14 @@ export default function Websites() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleAddWebsite}>Start Analysis</Button>
+              <LoadingButton
+                onClick={handleAddWebsite}
+                loading={processing}
+                loadingText="Starting..."
+                icon={<Play className="h-4 w-4" />}
+              >
+                Start Analysis
+              </LoadingButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -262,10 +324,12 @@ export default function Websites() {
             <CardDescription className="mb-4">
               Add your first website to start monitoring its AI visibility
             </CardDescription>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
+            <LoadingButton
+              onClick={() => setIsAddDialogOpen(true)}
+              icon={<Plus className="h-4 w-4" />}
+            >
               Add Your First Website
-            </Button>
+            </LoadingButton>
           </CardContent>
         </Card>
       )}
@@ -296,9 +360,14 @@ export default function Websites() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleAnalyzeNow(website.id)}
+                        disabled={isAnalyzing === website.id}
+                      >
                         <BarChart3 className="h-4 w-4 mr-2" />
-                        Analyze Now
+                        {isAnalyzing === website.id
+                          ? "Analyzing..."
+                          : "Analyze Now"}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleOpenSettings(website)}
@@ -306,7 +375,10 @@ export default function Websites() {
                         <Settings className="h-4 w-4 mr-2" />
                         Settings
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => confirmDelete(website.id)}
+                      >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
                       </DropdownMenuItem>
@@ -355,6 +427,21 @@ export default function Websites() {
         website={selectedWebsite}
         isOpen={isSettingsModalOpen}
         onClose={handleCloseSettings}
+      />
+
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setWebsiteToDelete(null);
+        }}
+        onConfirm={() =>
+          websiteToDelete && handleDeleteWebsite(websiteToDelete)
+        }
+        title="Delete Website"
+        description="Are you sure you want to delete this website? This will remove all associated analysis data and cannot be undone."
+        confirmText="Delete Website"
+        variant="destructive"
       />
     </div>
   );

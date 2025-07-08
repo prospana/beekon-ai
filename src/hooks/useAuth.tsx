@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase";
 
 interface AuthContextType {
   user: User | null;
@@ -57,13 +56,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
 
-    const { error } = await supabase.auth.signUp({
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
       },
     });
+
+    // Transfer this code to add workspaces
+    // console.log("signUp user", user);
+    // if (user?.id) {
+    //   const { data, error } = await supabase.from("workspaces").insert([
+    //     {
+    //       owner_id: user.id,
+    //       name: "My Workspace",
+    //     },
+    //   ]);
+
+    //   console.log("data", data);
+    //   console.log("error", error);
+    //   return { error };
+    // }
+
     return { error };
   };
 
