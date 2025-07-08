@@ -4,7 +4,7 @@ export interface Website {
   id: number;
   domain: string;
   displayName: string;
-  status: "active" | "pending" | "paused";
+  status: "pending" | "crawling" | "completed" | "failed";
   lastAnalyzed: string;
   totalTopics: number;
   avgVisibility: number;
@@ -30,7 +30,8 @@ export interface WebsiteCreateRequest {
   displayName?: string;
 }
 
-export interface WebsiteUpdateRequest extends Partial<Omit<Website, 'id' | 'createdAt' | 'updatedAt'>> {
+export interface WebsiteUpdateRequest
+  extends Partial<Omit<Website, "id" | "createdAt" | "updatedAt">> {
   domain?: string;
   displayName?: string;
 }

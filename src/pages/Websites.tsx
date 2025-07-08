@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import {
@@ -42,6 +42,7 @@ import { sendN8nWebhook } from "@/lib/http-request";
 import { useAuth } from "@/hooks/useAuth";
 import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
 import type { Website } from "@/types/website";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Websites() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -54,68 +55,14 @@ export default function Websites() {
   const [websiteToDelete, setWebsiteToDelete] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
-  const { workspaceId } = useAuth();
+  const { workspaceId, user } = useAuth();
 
   // Mock data with state for dynamic updates
-  const [websites, setWebsites] = useState<Website[]>([
-    {
-      id: 1,
-      domain: "example.com",
-      displayName: "Example Corp",
-      status: "active",
-      lastAnalyzed: "2024-01-07",
-      totalTopics: 12,
-      avgVisibility: 78,
-      analysisFrequency: "weekly",
-      autoAnalysis: true,
-      notifications: true,
-      competitorTracking: false,
-      weeklyReports: true,
-      showInDashboard: true,
-      priorityLevel: "high",
-      apiAccess: false,
-      dataRetention: "90",
-      exportEnabled: true,
-    },
-    {
-      id: 2,
-      domain: "mycompany.io",
-      displayName: "My Company",
-      status: "pending",
-      lastAnalyzed: "2024-01-05",
-      totalTopics: 8,
-      avgVisibility: 65,
-      analysisFrequency: "weekly",
-      autoAnalysis: true,
-      notifications: true,
-      competitorTracking: true,
-      weeklyReports: false,
-      showInDashboard: true,
-      priorityLevel: "medium",
-      apiAccess: false,
-      dataRetention: "30",
-      exportEnabled: false,
-    },
-    {
-      id: 3,
-      domain: "startup.tech",
-      displayName: "Tech Startup",
-      status: "active",
-      lastAnalyzed: "2024-01-06",
-      totalTopics: 15,
-      avgVisibility: 82,
-      analysisFrequency: "daily",
-      autoAnalysis: true,
-      notifications: false,
-      competitorTracking: true,
-      weeklyReports: true,
-      showInDashboard: true,
-      priorityLevel: "high",
-      apiAccess: true,
-      dataRetention: "365",
-      exportEnabled: true,
-    },
-  ]);
+  const [websites, setWebsites] = useState<Website[] | []>([]);
+
+  useEffect(() => {
+    supabase.from("website").select();
+  }, []);
 
   // Add `https://` if it doesn't exists
   const addProtocol = (domain: string) => {
@@ -185,12 +132,16 @@ export default function Websites() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "active":
-        return <Badge className="bg-success">Active</Badge>;
+      case "completed":
+        return <Badge className="bg-primary">Completed</Badge>;
       case "pending":
         return <Badge variant="secondary">Pending</Badge>;
+      case "crawling":
+        return <Badge variant="secondary">Crawling</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="destructive">Failed</Badge>;
     }
   };
 
@@ -205,6 +156,7 @@ export default function Websites() {
   };
 
   const handleAnalyzeNow = async (websiteId: number) => {
+    console.log("websiteId", websiteId);
     setIsAnalyzing(websiteId);
     try {
       // Simulate API call
@@ -316,7 +268,7 @@ export default function Websites() {
       </div>
 
       {/* Empty State */}
-      {websites.length === 0 && (
+      {websites?.length === 0 && (
         <Card className="text-center py-12">
           <CardContent>
             <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -336,7 +288,7 @@ export default function Websites() {
 
       {/* Websites Grid */}
       <div className="grid gap-6">
-        {websites.map((website) => (
+        {websites?.map((website) => (
           <Card key={website.id}>
             <CardHeader>
               <div className="flex items-center justify-between">
