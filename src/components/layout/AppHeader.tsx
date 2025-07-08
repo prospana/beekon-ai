@@ -12,6 +12,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ProfileModal } from '@/components/ProfileModal';
+import { WorkspaceDropdown } from '@/components/WorkspaceDropdown';
 import { LogOut, User, Settings } from 'lucide-react';
 
 export function AppHeader() {
@@ -30,6 +31,7 @@ export function AppHeader() {
         </div>
 
         <div className="flex items-center space-x-4">
+          <WorkspaceDropdown />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">

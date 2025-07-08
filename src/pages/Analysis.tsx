@@ -18,8 +18,11 @@ import {
 } from "@/components/ui/select";
 import { AnalysisConfigModal } from "@/components/AnalysisConfigModal";
 import { DetailedAnalysisModal } from "@/components/DetailedAnalysisModal";
+import { WorkspaceModal } from "@/components/WorkspaceModal";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Check, X, ExternalLink, Plus, Filter } from "lucide-react";
+import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { Search, Check, X, ExternalLink, Plus, Filter, Building } from "lucide-react";
 
 interface LLMData {
   mentioned: boolean;
@@ -40,6 +43,8 @@ interface AnalysisResult {
 
 export default function Analysis() {
   const { toast } = useToast();
+  const { currentWorkspace, loading } = useWorkspace();
+  const { enforceLimit, getRemainingCredits, getSubscriptionTier } = useSubscriptionEnforcement();
   const [selectedTopic, setSelectedTopic] = useState("all");
   const [selectedLLM, setSelectedLLM] = useState("all");
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -48,6 +53,7 @@ export default function Analysis() {
     null
   );
   const [isFiltering, setIsFiltering] = useState(false);
+  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
 
   // Mock data
   const topics = [
@@ -176,6 +182,65 @@ export default function Analysis() {
     </div>
   );
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Analysis Results</h1>
+          <p className="text-muted-foreground">Loading workspace...</p>
+        </div>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <div className="h-4 bg-muted rounded animate-pulse mb-2" />
+                <div className="h-3 bg-muted rounded animate-pulse w-1/3" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-20 bg-muted rounded animate-pulse" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Show workspace creation prompt when no workspace exists
+  if (!currentWorkspace) {
+    return (
+      <>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Analysis Results</h1>
+            <p className="text-muted-foreground">
+              Detailed analysis of your brand mentions across AI platforms
+            </p>
+          </div>
+          <div className="text-center py-12">
+            <Building className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Workspace Required</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              To run and view analysis results, you need to create a workspace first. Your workspace will track your usage and manage your analysis credits.
+            </p>
+            <LoadingButton
+              onClick={() => setShowCreateWorkspace(true)}
+              icon={<Plus className="h-4 w-4" />}
+              size="lg"
+            >
+              Create Workspace
+            </LoadingButton>
+          </div>
+        </div>
+        <WorkspaceModal
+          isOpen={showCreateWorkspace}
+          onClose={() => setShowCreateWorkspace(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -225,10 +290,19 @@ export default function Analysis() {
           </div>
 
           <LoadingButton
-            onClick={() => setIsConfigModalOpen(true)}
+            onClick={() => {
+              if (enforceLimit("websiteAnalyses", "New Analysis")) {
+                setIsConfigModalOpen(true);
+              }
+            }}
             icon={<Plus className="h-4 w-4" />}
           >
             New Analysis
+            {currentWorkspace && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                {getRemainingCredits()} left
+              </Badge>
+            )}
           </LoadingButton>
         </div>
 
@@ -279,7 +353,11 @@ export default function Analysis() {
                 Try adjusting your filters or run a new analysis
               </CardDescription>
               <LoadingButton
-                onClick={() => setIsConfigModalOpen(true)}
+                onClick={() => {
+                  if (enforceLimit("websiteAnalyses", "New Analysis")) {
+                    setIsConfigModalOpen(true);
+                  }
+                }}
                 icon={<Plus className="h-4 w-4" />}
               >
                 Run New Analysis

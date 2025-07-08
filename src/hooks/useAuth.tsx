@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { Session, User } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState } from "react";
 
 interface AuthContextType {
   user: User | null;
@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((_, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -39,15 +39,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (user?.id) {
       supabase
+        .schema("beekon_data")
         .from("workspaces")
         .select(`id`)
-        .match({ owner_id: user.id })
+        .eq("owner_id", user.id)
+        .limit(1)
+        .single()
         .then((res) => {
-          if (res.data && 1 === res.data.length) {
-            setWorkspaceId(res.data[0].id);
+          if (res.data) {
+            setWorkspaceId(res.data.id);
+          } else {
+            setWorkspaceId(null);
           }
         });
-      // You may want to handle the result of getWorkspace here
+    } else {
+      setWorkspaceId(null);
     }
 
     return () => subscription.unsubscribe();
@@ -56,31 +62,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
 
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
       },
     });
-
-    // Transfer this code to add workspaces
-    // console.log("signUp user", user);
-    // if (user?.id) {
-    //   const { data, error } = await supabase.from("workspaces").insert([
-    //     {
-    //       owner_id: user.id,
-    //       name: "My Workspace",
-    //     },
-    //   ]);
-
-    //   console.log("data", data);
-    //   console.log("error", error);
-    //   return { error };
-    // }
 
     return { error };
   };
