@@ -37,16 +37,20 @@ import {
 } from "lucide-react";
 import { sendN8nWebhook } from "@/lib/http-request";
 import { useAuth } from "@/hooks/useAuth";
+import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
+import type { Website } from "@/types/website";
 
 export default function Websites() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [domain, setDomain] = useState("");
   const [displayName, setDisplayName] = useState("");
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { workspaceId } = useAuth();
 
   // Mock data
-  const websites = [
+  const websites: Website[] = [
     {
       id: 1,
       domain: "example.com",
@@ -55,6 +59,16 @@ export default function Websites() {
       lastAnalyzed: "2024-01-07",
       totalTopics: 12,
       avgVisibility: 78,
+      analysisFrequency: "weekly",
+      autoAnalysis: true,
+      notifications: true,
+      competitorTracking: false,
+      weeklyReports: true,
+      showInDashboard: true,
+      priorityLevel: "high",
+      apiAccess: false,
+      dataRetention: "90",
+      exportEnabled: true,
     },
     {
       id: 2,
@@ -64,6 +78,16 @@ export default function Websites() {
       lastAnalyzed: "2024-01-05",
       totalTopics: 8,
       avgVisibility: 65,
+      analysisFrequency: "weekly",
+      autoAnalysis: true,
+      notifications: true,
+      competitorTracking: true,
+      weeklyReports: false,
+      showInDashboard: true,
+      priorityLevel: "medium",
+      apiAccess: false,
+      dataRetention: "30",
+      exportEnabled: false,
     },
     {
       id: 3,
@@ -73,6 +97,16 @@ export default function Websites() {
       lastAnalyzed: "2024-01-06",
       totalTopics: 15,
       avgVisibility: 82,
+      analysisFrequency: "daily",
+      autoAnalysis: true,
+      notifications: false,
+      competitorTracking: true,
+      weeklyReports: true,
+      showInDashboard: true,
+      priorityLevel: "high",
+      apiAccess: true,
+      dataRetention: "365",
+      exportEnabled: true,
     },
   ];
 
@@ -83,7 +117,7 @@ export default function Websites() {
   };
 
   const handleAddWebsite = async () => {
-    console.log("user", user);
+    console.log("workspaceId", workspaceId);
     if (!domain) {
       toast({
         title: "Error",
@@ -118,6 +152,7 @@ export default function Websites() {
     const response = await sendN8nWebhook("webhook/website-onboarding", {
       website: addProtocol(domain),
       display_name: displayName,
+      workspace_id: workspaceId,
     });
 
     if (!response.success) {
@@ -135,9 +170,9 @@ export default function Websites() {
       description: `Analysis started for ${domain}`,
     });
 
-    // setDomain("");
-    // setDisplayName("");
-    // setIsAddDialogOpen(false);
+    setDomain("");
+    setDisplayName("");
+    setIsAddDialogOpen(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -149,6 +184,16 @@ export default function Websites() {
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
+  };
+
+  const handleOpenSettings = (website: Website) => {
+    setSelectedWebsite(website);
+    setIsSettingsModalOpen(true);
+  };
+
+  const handleCloseSettings = () => {
+    setIsSettingsModalOpen(false);
+    setSelectedWebsite(null);
   };
 
   return (
@@ -255,7 +300,9 @@ export default function Websites() {
                         <BarChart3 className="h-4 w-4 mr-2" />
                         Analyze Now
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleOpenSettings(website)}
+                      >
                         <Settings className="h-4 w-4 mr-2" />
                         Settings
                       </DropdownMenuItem>
@@ -302,6 +349,13 @@ export default function Websites() {
           </Card>
         ))}
       </div>
+
+      {/* Website Settings Modal */}
+      <WebsiteSettingsModal
+        website={selectedWebsite}
+        isOpen={isSettingsModalOpen}
+        onClose={handleCloseSettings}
+      />
     </div>
   );
 }

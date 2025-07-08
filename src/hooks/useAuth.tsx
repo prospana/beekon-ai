@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  workspaceId: string | null;
   signUp: (email: string, password: string) => Promise<{ error: unknown }>;
   signIn: (email: string, password: string) => Promise<{ error: unknown }>;
   signOut: () => Promise<void>;
@@ -17,6 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     // Set up auth state listener
@@ -35,8 +38,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
+    if (user?.id) {
+      supabase
+        .from("workspaces")
+        .select(`id`)
+        .match({ owner_id: user.id })
+        .then((res) => {
+          if (res.data && 1 === res.data.length) {
+            setWorkspaceId(res.data[0].id);
+          }
+        });
+      // You may want to handle the result of getWorkspace here
+    }
+
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user?.id]);
 
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
@@ -66,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     session,
+    workspaceId,
     loading,
     signUp,
     signIn,
