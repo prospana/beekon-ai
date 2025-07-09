@@ -1,5 +1,5 @@
-import { useWorkspace, type SubscriptionTier } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/hooks/use-toast";
+import { SubscriptionTier, useWorkspace } from "./useWorkspace";
 
 export interface SubscriptionLimits {
   websiteAnalyses: number;
@@ -45,20 +45,23 @@ export function useSubscriptionEnforcement() {
   const { toast } = useToast();
 
   const getCurrentLimits = (): SubscriptionLimits => {
-    const tier = (currentWorkspace?.subscription_tier as SubscriptionTier) || "free";
+    const tier =
+      (currentWorkspace?.subscription_tier as SubscriptionTier) || "free";
     return subscriptionLimits[tier] || subscriptionLimits.free;
   };
 
   const canPerformAction = (action: keyof SubscriptionLimits): boolean => {
     if (!currentWorkspace) return false;
-    
+
     const limits = getCurrentLimits();
-    
+
     switch (action) {
       case "websiteAnalyses":
         return (currentWorkspace.credits_remaining || 0) > 0;
       case "competitorTracking":
-        return limits.competitorTracking === -1 || limits.competitorTracking > 0;
+        return (
+          limits.competitorTracking === -1 || limits.competitorTracking > 0
+        );
       case "apiAccess":
         return limits.apiAccess;
       default:
@@ -66,10 +69,14 @@ export function useSubscriptionEnforcement() {
     }
   };
 
-  const enforceLimit = (action: keyof SubscriptionLimits, actionName: string): boolean => {
+  const enforceLimit = (
+    action: keyof SubscriptionLimits,
+    actionName: string
+  ): boolean => {
     if (!canPerformAction(action)) {
-      const tier = (currentWorkspace?.subscription_tier as SubscriptionTier) || "free";
-      
+      const tier =
+        (currentWorkspace?.subscription_tier as SubscriptionTier) || "free";
+
       let message = "";
       let upgradeAction = "";
 
@@ -79,8 +86,13 @@ export function useSubscriptionEnforcement() {
             message = "Please create a workspace to start analyzing websites.";
             upgradeAction = "Create Workspace";
           } else {
-            message = `You have reached your analysis limit for the ${tier} plan. You have ${currentWorkspace.credits_remaining || 0} credits remaining.`;
-            upgradeAction = tier === "free" ? "Upgrade to Starter" : "Upgrade to Professional";
+            message = `You have reached your analysis limit for the ${tier} plan. You have ${
+              currentWorkspace.credits_remaining || 0
+            } credits remaining.`;
+            upgradeAction =
+              tier === "free"
+                ? "Upgrade to Starter"
+                : "Upgrade to Professional";
           }
           break;
         case "competitorTracking":
@@ -102,14 +114,18 @@ export function useSubscriptionEnforcement() {
           }
           break;
         default:
-          message = !currentWorkspace 
+          message = !currentWorkspace
             ? "Please create a workspace to use this feature."
             : "This feature is not available in your current plan.";
-          upgradeAction = !currentWorkspace ? "Create Workspace" : "Upgrade Plan";
+          upgradeAction = !currentWorkspace
+            ? "Create Workspace"
+            : "Upgrade Plan";
       }
 
       toast({
-        title: !currentWorkspace ? "Workspace Required" : "Feature Limit Reached",
+        title: !currentWorkspace
+          ? "Workspace Required"
+          : "Feature Limit Reached",
         description: message,
         variant: "destructive",
         action: {
@@ -134,7 +150,7 @@ export function useSubscriptionEnforcement() {
       });
       return false;
     }
-    
+
     const credits = currentWorkspace.credits_remaining || 0;
     if (credits <= 0) {
       toast({

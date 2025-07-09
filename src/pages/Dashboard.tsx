@@ -1,3 +1,11 @@
+import {
+  LLMPerformanceChart,
+  MentionTrendChart,
+  QuickStats,
+  SentimentDistributionChart,
+  TopicRadarChart,
+  WebsitePerformanceChart,
+} from "@/components/DashboardCharts";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,10 +16,19 @@ import {
 } from "@/components/ui/card";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Progress } from "@/components/ui/progress";
-import { WorkspaceModal } from "@/components/WorkspaceModal";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { useToast } from "@/hooks/use-toast";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { WorkspaceModal } from "@/components/WorkspaceModal";
+import { useToast } from "@/hooks/use-toast";
+import { useDashboardMetrics } from "@/hooks/useDashboard";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { dashboardService } from "@/services/dashboardService";
+import {
+  AlertCircle,
   BarChart3,
   Building,
   Download,
@@ -24,99 +41,89 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CartesianGrid,
   Line,
   LineChart,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { currentWorkspace, loading } = useWorkspace();
+  const { currentWorkspace, loading, websites } = useWorkspace();
+  const navigate = useNavigate();
   const [isExporting, setIsExporting] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-  // Mock data
-  const visibilityData = [
-    { date: "2024-01-01", visibility: 65 },
-    { date: "2024-01-02", visibility: 68 },
-    { date: "2024-01-03", visibility: 72 },
-    { date: "2024-01-04", visibility: 70 },
-    { date: "2024-01-05", visibility: 75 },
-    { date: "2024-01-06", visibility: 78 },
-    { date: "2024-01-07", visibility: 82 },
-  ];
+  const [dateFilter, setDateFilter] = useState<"7d" | "30d" | "90d">("7d");
+  const [showAllCharts, setShowAllCharts] = useState(false);
 
-  const performanceData = [
-    {
-      topic: "AI Tools",
-      visibility: 85,
-      rank: 2.1,
-      sentiment: "positive",
-      trending: "up",
-    },
-    {
-      topic: "Software Solutions",
-      visibility: 72,
-      rank: 3.2,
-      sentiment: "positive",
-      trending: "up",
-    },
-    {
-      topic: "Machine Learning",
-      visibility: 68,
-      rank: 2.8,
-      sentiment: "neutral",
-      trending: "down",
-    },
-    {
-      topic: "Data Analytics",
-      visibility: 91,
-      rank: 1.9,
-      sentiment: "positive",
-      trending: "up",
-    },
-    {
-      topic: "Cloud Services",
-      visibility: 45,
-      rank: 4.1,
-      sentiment: "negative",
-      trending: "down",
-    },
-  ];
+  // Use dashboard data hooks
+  const {
+    metrics,
+    timeSeriesData,
+    topicPerformance,
+    llmPerformance,
+    websitePerformance,
+    isLoading: isDashboardLoading,
+    isRefreshing,
+    refreshData,
+    error: dashboardError,
+    hasData,
+    clearError,
+  } = useDashboardMetrics({ period: dateFilter });
 
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case "positive":
-        return "bg-success";
-      case "negative":
-        return "bg-destructive";
-      default:
-        return "bg-warning";
-    }
+  const websiteIds = websites?.map((w) => w.id) || [];
+
+  const getSentimentColor = (sentiment: number) => {
+    if (sentiment >= 60) return "bg-success";
+    if (sentiment <= 40) return "bg-destructive";
+    return "bg-warning";
   };
 
-  const getSentimentText = (sentiment: string) => {
-    switch (sentiment) {
-      case "positive":
-        return "text-success";
-      case "negative":
-        return "text-destructive";
-      default:
-        return "text-warning";
-    }
+  const getSentimentText = (sentiment: number) => {
+    if (sentiment >= 60) return "text-success";
+    if (sentiment <= 40) return "text-destructive";
+    return "text-warning";
+  };
+
+  const getSentimentLabel = (sentiment: number) => {
+    if (sentiment >= 60) return "positive";
+    if (sentiment <= 40) return "negative";
+    return "neutral";
   };
 
   const handleExportData = async (format: "pdf" | "csv") => {
+    if (!hasData || websiteIds.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Please ensure you have analysis data before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsExporting(true);
     try {
-      // Simulate export
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Create real export using dashboard service
+      const blob = await dashboardService.exportDashboardData(
+        websiteIds,
+        format
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dashboard-${Date.now()}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
 
       toast({
         title: "Export successful",
@@ -133,43 +140,47 @@ export default function Dashboard() {
     }
   };
 
-  const handleRefreshData = async () => {
-    setIsRefreshing(true);
-    try {
-      // Simulate data refresh
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+  const handleMetricClick = (
+    metricName: string,
+    additionalParams?: Record<string, string>
+  ) => {
+    // Navigate to Analysis page with context
+    const params = new URLSearchParams();
+    params.set("focus", metricName.toLowerCase().replace(/ /g, "-"));
 
-      toast({
-        title: "Data refreshed",
-        description:
-          "Dashboard data has been updated with the latest information.",
+    if (additionalParams) {
+      Object.entries(additionalParams).forEach(([key, value]) => {
+        params.set(key, value);
       });
-    } catch (error) {
-      toast({
-        title: "Refresh failed",
-        description: "Failed to refresh data. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
     }
+
+    navigate(`/analysis?${params.toString()}`);
   };
 
-  const handleMetricClick = (metricName: string) => {
-    toast({
-      title: `${metricName} Details`,
-      description: `View detailed breakdown for ${metricName}`,
-    });
+  const formatTrendText = (trend: number) => {
+    const abs = Math.abs(trend);
+    const direction = trend >= 0 ? "improvement" : "decline";
+    return `${abs}% ${direction}`;
+  };
+
+  const getTrendIcon = (trend: number) => {
+    return trend >= 0 ? TrendingUp : TrendingDown;
+  };
+
+  const getTrendColor = (trend: number) => {
+    return trend >= 0 ? "text-success" : "text-destructive";
   };
 
   // Show loading state
-  if (loading) {
+  if (loading || isDashboardLoading) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Loading workspace...</p>
+            <p className="text-muted-foreground">
+              {loading ? "Loading workspace..." : "Loading dashboard data..."}
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -185,6 +196,15 @@ export default function Dashboard() {
             </Card>
           ))}
         </div>
+        <Card>
+          <CardHeader>
+            <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
+            <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 bg-muted rounded animate-pulse" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -219,260 +239,457 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Monitor your brand's AI visibility performance
-            <span className="ml-2">
-              • {currentWorkspace.name}
-              {currentWorkspace.credits_remaining !== null && (
-                <span className="ml-1 text-sm">
-                  ({currentWorkspace.credits_remaining} credits remaining)
-                </span>
-              )}
-            </span>
-          </p>
-        </div>
-        <div className="flex space-x-2">
-          <LoadingButton
-            variant="outline"
-            size="sm"
-            loading={isRefreshing}
-            loadingText="Refreshing..."
-            onClick={handleRefreshData}
-            icon={<RefreshCw className="h-4 w-4" />}
-          >
-            Refresh
-          </LoadingButton>
-          <LoadingButton
-            variant="outline"
-            size="sm"
-            loading={isExporting}
-            loadingText="Exporting..."
-            onClick={() => handleExportData("pdf")}
-            icon={<Download className="h-4 w-4" />}
-          >
-            Export
-          </LoadingButton>
-        </div>
-      </div>
-
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => handleMetricClick("Overall Visibility Score")}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>
-              Overall Visibility Score
-            </CardTitle>
-            <div className="flex items-center space-x-1">
-              <Target className="h-4 w-4 text-muted-foreground" />
-              <ExternalLink className="h-3 w-3 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">78%</div>
-            <p className="text-xs text-success flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              +12% from last week
+    <TooltipProvider>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Monitor your brand's AI visibility performance
+              <span className="ml-2">
+                • {currentWorkspace.name}
+                {currentWorkspace.credits_remaining !== null && (
+                  <span className="ml-1 text-sm">
+                    ({currentWorkspace.credits_remaining} credits remaining)
+                  </span>
+                )}
+                {metrics && (
+                  <span className="ml-1 text-sm">
+                    • {metrics.activeWebsites} websites, {metrics.totalAnalyses}{" "}
+                    analyses
+                  </span>
+                )}
+              </span>
             </p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => handleMetricClick("Average Rank")}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Average Rank</CardTitle>
-            <div className="flex items-center space-x-1">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <ExternalLink className="h-3 w-3 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">2.8</div>
-            <p className="text-xs text-success flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              Improved by 0.3
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => handleMetricClick("Total Mentions")}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>
-              Total Mentions
-            </CardTitle>
-            <div className="flex items-center space-x-1">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <ExternalLink className="h-3 w-3 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">1,247</div>
-            <p className="text-xs text-success flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              +23% this month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => handleMetricClick("Sentiment Score")}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>
-              Sentiment Score
-            </CardTitle>
-            <div className="flex items-center space-x-1">
-              <Zap className="h-4 w-4 text-muted-foreground" />
-              <ExternalLink className="h-3 w-3 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">84%</div>
-            <p className="text-xs text-success flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              +5% improvement
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Visibility Chart */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Visibility Over Time</CardTitle>
-              <CardDescription>
-                Your brand's visibility trend across all LLMs (last 7 days)
-              </CardDescription>
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExportData("csv")}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={visibilityData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="date"
-                tickFormatter={(value) => new Date(value).toLocaleDateString()}
-              />
-              <YAxis />
-              <Tooltip
-                labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                formatter={(value) => [`${value}%`, "Visibility Score"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="visibility"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Performance by Topic */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Performance by Topic</CardTitle>
-              <CardDescription>
-                How your brand performs across different topics and keywords
-              </CardDescription>
+          <div className="flex items-center space-x-2">
+            <div className="flex gap-1 mr-2">
+              {["7d", "30d", "90d"].map((period) => (
+                <Button
+                  key={period}
+                  variant={dateFilter === period ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setDateFilter(period as "7d" | "30d" | "90d")}
+                  disabled={isRefreshing}
+                >
+                  {period}
+                </Button>
+              ))}
             </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExportData("pdf")}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export Report
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAllCharts(!showAllCharts)}
+              disabled={!hasData}
+            >
+              {showAllCharts ? "Hide" : "Show"} Details
+            </Button>
+            <LoadingButton
+              variant="outline"
+              size="sm"
+              loading={isRefreshing}
+              loadingText="Refreshing..."
+              onClick={refreshData}
+              icon={<RefreshCw className="h-4 w-4" />}
+            >
+              Refresh
+            </LoadingButton>
+            <LoadingButton
+              variant="outline"
+              size="sm"
+              loading={isExporting}
+              loadingText="Exporting..."
+              onClick={() => handleExportData("pdf")}
+              icon={<Download className="h-4 w-4" />}
+              disabled={!hasData}
+            >
+              Export
+            </LoadingButton>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {performanceData.map((item, index) => (
+        </div>
+
+        {/* Error State */}
+        {dashboardError && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <h3 className="font-semibold text-destructive">
+                  Error Loading Dashboard Data
+                </h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                {dashboardError.message}
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  onClick={refreshData}
+                  variant="outline"
+                  size="sm"
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+                <Button onClick={clearError} variant="outline" size="sm">
+                  Dismiss
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleMetricClick("Overall Visibility Score")}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle>Overall Visibility Score</CardTitle>
+                  <div className="flex items-center space-x-1">
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-primary">
+                    {metrics?.overallVisibilityScore ?? 0}%
+                  </div>
+                  {metrics && metrics.improvementTrend !== 0 && (
+                    <p
+                      className={`text-xs flex items-center ${getTrendColor(
+                        metrics.improvementTrend
+                      )}`}
+                    >
+                      {React.createElement(
+                        getTrendIcon(metrics.improvementTrend),
+                        { className: "h-3 w-3 mr-1" }
+                      )}
+                      {formatTrendText(metrics.improvementTrend)}
+                    </p>
+                  )}
+                  {(!metrics || metrics.improvementTrend === 0) && (
+                    <p className="text-xs text-muted-foreground">
+                      No trend data
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Click to view detailed visibility analysis</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleMetricClick("Average Rank")}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Average Rank</CardTitle>
+              <div className="flex items-center space-x-1">
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {metrics?.averageRanking
+                  ? metrics.averageRanking.toFixed(1)
+                  : "0.0"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {metrics?.totalMentions
+                  ? "Across all mentions"
+                  : "No ranking data"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleMetricClick("Total Mentions")}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Total Mentions</CardTitle>
+              <div className="flex items-center space-x-1">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {metrics?.totalMentions?.toLocaleString() ?? 0}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {metrics?.totalAnalyses
+                  ? `From ${metrics.totalAnalyses} analyses`
+                  : "No mention data"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleMetricClick("Sentiment Score")}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Sentiment Score</CardTitle>
+              <div className="flex items-center space-x-1">
+                <Zap className="h-4 w-4 text-muted-foreground" />
+                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
               <div
-                key={index}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className={`text-2xl font-bold ${
+                  metrics ? getSentimentText(metrics.sentimentScore) : ""
+                }`}
               >
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h4 className="font-medium">{item.topic}</h4>
-                    {item.trending === "up" ? (
-                      <TrendingUp className="h-4 w-4 text-success" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4 text-destructive" />
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-1">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Visibility</span>
-                        <span className="font-medium">{item.visibility}%</span>
-                      </div>
-                      <Progress value={item.visibility} className="h-2" />
-                    </div>
-                    <div className="text-center">
-                      <div className="text-sm text-muted-foreground">
-                        Avg Rank
-                      </div>
-                      <div className="font-medium">{item.rank}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-sm text-muted-foreground">
-                        Sentiment
-                      </div>
-                      <div className="flex items-center justify-center">
-                        <div
-                          className={`w-2 h-2 rounded-full ${getSentimentColor(
-                            item.sentiment
-                          )} mr-1`}
-                        />
-                        <span
-                          className={`text-sm capitalize ${getSentimentText(
-                            item.sentiment
-                          )}`}
-                        >
-                          {item.sentiment}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                {metrics?.sentimentScore ?? 0}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {metrics
+                  ? getSentimentLabel(metrics.sentimentScore)
+                  : "No sentiment data"}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Visibility Chart */}
+        {timeSeriesData.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Visibility Over Time</CardTitle>
+                  <CardDescription>
+                    Your brand's visibility trend across all LLMs (last{" "}
+                    {dateFilter})
+                  </CardDescription>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportData("csv")}
+                    disabled={!hasData}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
                 </div>
               </div>
-            ))}
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(value) =>
+                      new Date(value).toLocaleDateString()
+                    }
+                  />
+                  <YAxis domain={[0, 100]} />
+                  <RechartsTooltip
+                    labelFormatter={(value) =>
+                      new Date(value).toLocaleDateString()
+                    }
+                    formatter={(value) => [`${value}%`, "Visibility Score"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="visibility"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: "hsl(var(--primary))" }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Quick Stats */}
+        {hasData && (
+          <QuickStats
+            stats={{
+              totalWebsites: metrics?.activeWebsites || 0,
+              totalTopics: topicPerformance.length,
+              averageVisibility: metrics?.overallVisibilityScore || 0,
+              topPerformingTopic: metrics?.topPerformingTopic ?? null,
+            }}
+          />
+        )}
+
+        {/* Enhanced Analytics Charts */}
+        {hasData && showAllCharts && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LLM Performance Chart */}
+            {llmPerformance.length > 0 && (
+              <LLMPerformanceChart llmData={llmPerformance} />
+            )}
+
+            {/* Website Performance Chart */}
+            {websitePerformance.length > 0 && (
+              <WebsitePerformanceChart websiteData={websitePerformance} />
+            )}
+
+            {/* Sentiment Distribution */}
+            {metrics && (
+              <SentimentDistributionChart
+                sentimentData={[
+                  {
+                    name: "Positive",
+                    value: metrics.sentimentScore > 60 ? 60 : 20,
+                    color: "#10B981",
+                  },
+                  { name: "Neutral", value: 20, color: "#F59E0B" },
+                  {
+                    name: "Negative",
+                    value: metrics.sentimentScore < 40 ? 20 : 20,
+                    color: "#EF4444",
+                  },
+                ]}
+              />
+            )}
+
+            {/* Mention Trends */}
+            {timeSeriesData.length > 0 && (
+              <MentionTrendChart trendData={timeSeriesData} />
+            )}
+
+            {/* Topic Radar Chart */}
+            {topicPerformance.length > 0 && (
+              <TopicRadarChart topicData={topicPerformance} />
+            )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+
+        {/* Performance by Topic */}
+        {topicPerformance.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Performance by Topic</CardTitle>
+                  <CardDescription>
+                    How your brand performs across different topics and keywords
+                  </CardDescription>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExportData("pdf")}
+                    disabled={!hasData}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Report
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {topicPerformance.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() =>
+                      handleMetricClick("topic-details", { topic: item.topic })
+                    }
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h4 className="font-medium">{item.topic}</h4>
+                        {item.trend !== 0 &&
+                          React.createElement(getTrendIcon(item.trend), {
+                            className: `h-4 w-4 ${getTrendColor(item.trend)}`,
+                          })}
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-1">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Visibility</span>
+                            <span className="font-medium">
+                              {item.visibility}%
+                            </span>
+                          </div>
+                          <Progress value={item.visibility} className="h-2" />
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm text-muted-foreground">
+                            Avg Rank
+                          </div>
+                          <div className="font-medium">
+                            {item.averageRank > 0
+                              ? item.averageRank.toFixed(1)
+                              : "N/A"}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm text-muted-foreground">
+                            Sentiment
+                          </div>
+                          <div className="flex items-center justify-center">
+                            <div
+                              className={`w-2 h-2 rounded-full ${getSentimentColor(
+                                item.sentiment
+                              )} mr-1`}
+                            />
+                            <span
+                              className={`text-sm capitalize ${getSentimentText(
+                                item.sentiment
+                              )}`}
+                            >
+                              {getSentimentLabel(item.sentiment)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm text-muted-foreground">
+                            Mentions
+                          </div>
+                          <div className="font-medium">{item.mentions}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty State */}
+        {!hasData && !isDashboardLoading && (
+          <Card className="text-center py-12">
+            <CardContent>
+              <BarChart3 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <CardTitle className="mb-2">No Dashboard Data</CardTitle>
+              <CardDescription className="mb-4">
+                {websiteIds.length === 0
+                  ? "Add websites to your workspace to start tracking your brand's AI visibility."
+                  : "Run some analyses to see your dashboard metrics and insights."}
+              </CardDescription>
+              <Button
+                onClick={() =>
+                  (window.location.href =
+                    websiteIds.length === 0 ? "/websites" : "/analysis")
+                }
+              >
+                {websiteIds.length === 0 ? "Add Websites" : "Run Analysis"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useWorkspace, type Workspace } from "@/contexts/WorkspaceContext";
+import { useWorkspace, Workspace } from "@/hooks/useWorkspace";
 import {
   Building,
   ChevronDown,

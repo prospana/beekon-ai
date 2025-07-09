@@ -30,10 +30,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WorkspaceModal } from "@/components/WorkspaceModal";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAnalysisErrorHandler } from "@/hooks/useAnalysisError";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import {
   analysisService,
   type AnalysisResult,
@@ -77,8 +77,7 @@ interface LegacyAnalysisResult {
 export default function Analysis() {
   const { toast } = useToast();
   const { currentWorkspace, loading, websites } = useWorkspace();
-  const { enforceLimit, getRemainingCredits, getSubscriptionTier } =
-    useSubscriptionEnforcement();
+  const { enforceLimit, getRemainingCredits } = useSubscriptionEnforcement();
   const { error, isRetrying, handleError, retryOperation, clearError } =
     useAnalysisErrorHandler();
   const [selectedTopic, setSelectedTopic] = useState("all");

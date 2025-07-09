@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -10,11 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -22,13 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
-import { analysisService, type AnalysisProgress } from "@/services/analysisService";
-import { Search, Zap, Plus, X, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  analysisService,
+  type AnalysisProgress,
+} from "@/services/analysisService";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertCircle, CheckCircle, Plus, Search, X, Zap } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 const analysisConfigSchema = z.object({
   analysisName: z.string().min(1, "Analysis name is required"),
@@ -60,8 +63,11 @@ export function AnalysisConfigModal({
   const [isLoading, setIsLoading] = useState(false);
   const [customTopic, setCustomTopic] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
-  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
-  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
+  const [analysisProgress, setAnalysisProgress] =
+    useState<AnalysisProgress | null>(null);
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(
+    null
+  );
 
   const availableTopics = [
     "AI Tools",
@@ -75,7 +81,11 @@ export function AnalysisConfigModal({
   ];
 
   const availableLLMs = [
-    { id: "chatgpt", name: "ChatGPT", description: "OpenAI's conversational AI" },
+    {
+      id: "chatgpt",
+      name: "ChatGPT",
+      description: "OpenAI's conversational AI",
+    },
     { id: "claude", name: "Claude", description: "Anthropic's AI assistant" },
     { id: "gemini", name: "Gemini", description: "Google's AI model" },
     { id: "perplexity", name: "Perplexity", description: "AI-powered search" },
@@ -135,13 +145,13 @@ export function AnalysisConfigModal({
       // Subscribe to progress updates
       analysisService.subscribeToProgress(analysisId, (progress) => {
         setAnalysisProgress(progress);
-        
+
         if (progress.status === "completed") {
           toast({
             title: "Analysis completed!",
             description: `${data.analysisName} analysis has been completed successfully.`,
           });
-          
+
           // Reset form and close modal after a delay
           setTimeout(() => {
             handleClose();
@@ -149,21 +159,22 @@ export function AnalysisConfigModal({
         } else if (progress.status === "failed") {
           toast({
             title: "Analysis failed",
-            description: progress.error || "The analysis failed to complete. Please try again.",
+            description:
+              progress.error ||
+              "The analysis failed to complete. Please try again.",
             variant: "destructive",
           });
-          
+
           setTimeout(() => {
             handleClose();
           }, 2000);
         }
       });
-      
+
       toast({
         title: "Analysis started!",
         description: `${data.analysisName} analysis has been queued and will begin shortly.`,
       });
-      
     } catch (error) {
       console.error("Failed to start analysis:", error);
       toast({
@@ -187,7 +198,10 @@ export function AnalysisConfigModal({
   };
 
   const addCustomTopic = () => {
-    if (customTopic.trim() && !form.watch("topics").includes(customTopic.trim())) {
+    if (
+      customTopic.trim() &&
+      !form.watch("topics").includes(customTopic.trim())
+    ) {
       const currentTopics = form.watch("topics");
       form.setValue("topics", [...currentTopics, customTopic.trim()]);
       setCustomTopic("");
@@ -196,7 +210,10 @@ export function AnalysisConfigModal({
 
   const removeTopic = (topicToRemove: string) => {
     const currentTopics = form.watch("topics");
-    form.setValue("topics", currentTopics.filter(topic => topic !== topicToRemove));
+    form.setValue(
+      "topics",
+      currentTopics.filter((topic) => topic !== topicToRemove)
+    );
   };
 
   const addCustomPrompt = () => {
@@ -209,13 +226,19 @@ export function AnalysisConfigModal({
 
   const removePrompt = (index: number) => {
     const currentPrompts = form.watch("customPrompts");
-    form.setValue("customPrompts", currentPrompts.filter((_, i) => i !== index));
+    form.setValue(
+      "customPrompts",
+      currentPrompts.filter((_, i) => i !== index)
+    );
   };
 
   const toggleLLM = (llmId: string) => {
     const currentLLMs = form.watch("llmModels");
     if (currentLLMs.includes(llmId)) {
-      form.setValue("llmModels", currentLLMs.filter(id => id !== llmId));
+      form.setValue(
+        "llmModels",
+        currentLLMs.filter((id) => id !== llmId)
+      );
     } else {
       form.setValue("llmModels", [...currentLLMs, llmId]);
     }
@@ -230,7 +253,8 @@ export function AnalysisConfigModal({
             <span>Configure New Analysis</span>
           </DialogTitle>
           <DialogDescription>
-            Set up a new analysis to monitor your brand mentions across AI platforms
+            Set up a new analysis to monitor your brand mentions across AI
+            platforms
           </DialogDescription>
         </DialogHeader>
 
@@ -247,22 +271,25 @@ export function AnalysisConfigModal({
                   <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 )}
                 <span className="font-medium">
-                  {analysisProgress.status === "completed" ? "Analysis Complete" :
-                   analysisProgress.status === "failed" ? "Analysis Failed" :
-                   "Analysis Running"}
+                  {analysisProgress.status === "completed"
+                    ? "Analysis Complete"
+                    : analysisProgress.status === "failed"
+                    ? "Analysis Failed"
+                    : "Analysis Running"}
                 </span>
               </div>
               <span className="text-sm text-muted-foreground">
-                {analysisProgress.completedSteps} / {analysisProgress.totalSteps}
+                {analysisProgress.completedSteps} /{" "}
+                {analysisProgress.totalSteps}
               </span>
             </div>
-            
+
             <Progress value={analysisProgress.progress} className="mb-2" />
-            
+
             <p className="text-sm text-muted-foreground">
               {analysisProgress.currentStep}
             </p>
-            
+
             {analysisProgress.error && (
               <p className="text-sm text-destructive mt-2">
                 {analysisProgress.error}
@@ -293,7 +320,11 @@ export function AnalysisConfigModal({
             <Label>Topics to Monitor</Label>
             <div className="flex flex-wrap gap-2 mb-3">
               {form.watch("topics").map((topic) => (
-                <Badge key={topic} variant="default" className="flex items-center space-x-1">
+                <Badge
+                  key={topic}
+                  variant="default"
+                  className="flex items-center space-x-1"
+                >
                   <span>{topic}</span>
                   <Button
                     type="button"
@@ -307,40 +338,46 @@ export function AnalysisConfigModal({
                 </Badge>
               ))}
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
                 {availableTopics
-                  .filter(topic => !form.watch("topics").includes(topic))
+                  .filter((topic) => !form.watch("topics").includes(topic))
                   .map((topic) => (
-                  <Badge
-                    key={topic}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-accent"
-                    onClick={() => {
-                      const currentTopics = form.watch("topics");
-                      form.setValue("topics", [...currentTopics, topic]);
-                    }}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    {topic}
-                  </Badge>
-                ))}
+                    <Badge
+                      key={topic}
+                      variant="outline"
+                      className="cursor-pointer hover:bg-accent"
+                      onClick={() => {
+                        const currentTopics = form.watch("topics");
+                        form.setValue("topics", [...currentTopics, topic]);
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      {topic}
+                    </Badge>
+                  ))}
               </div>
-              
+
               <div className="flex gap-3">
                 <Input
                   placeholder="Add custom topic..."
                   value={customTopic}
                   onChange={(e) => setCustomTopic(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addCustomTopic())}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && (e.preventDefault(), addCustomTopic())
+                  }
                 />
-                <Button type="button" variant="outline" onClick={addCustomTopic}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addCustomTopic}
+                >
                   Add
                 </Button>
               </div>
             </div>
-            
+
             {form.formState.errors.topics && (
               <p className="text-sm text-destructive">
                 {form.formState.errors.topics.message}
@@ -353,7 +390,10 @@ export function AnalysisConfigModal({
             <Label>Custom Prompts (Optional)</Label>
             <div className="space-y-2">
               {form.watch("customPrompts").map((prompt, index) => (
-                <div key={index} className="flex items-start space-x-2 p-3 border rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-start space-x-2 p-3 border rounded-lg"
+                >
                   <span className="text-sm flex-1">{prompt}</span>
                   <Button
                     type="button"
@@ -366,7 +406,7 @@ export function AnalysisConfigModal({
                 </div>
               ))}
             </div>
-            
+
             <div className="space-y-2">
               <Textarea
                 placeholder="Enter a custom prompt to test specific scenarios..."
@@ -386,14 +426,19 @@ export function AnalysisConfigModal({
             <Label>AI Models to Analyze</Label>
             <div className="grid grid-cols-2 gap-3">
               {availableLLMs.map((llm) => (
-                <div key={llm.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                <div
+                  key={llm.id}
+                  className="flex items-center space-x-3 p-3 border rounded-lg"
+                >
                   <Checkbox
                     checked={form.watch("llmModels").includes(llm.id)}
                     onCheckedChange={() => toggleLLM(llm.id)}
                   />
                   <div className="flex-1">
                     <div className="font-medium">{llm.name}</div>
-                    <div className="text-sm text-muted-foreground">{llm.description}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {llm.description}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -411,7 +456,12 @@ export function AnalysisConfigModal({
               <Label htmlFor="analysisType">Analysis Type</Label>
               <Select
                 value={form.watch("analysisType")}
-                onValueChange={(value) => form.setValue("analysisType", value as "comprehensive" | "focused" | "competitive")}
+                onValueChange={(value) =>
+                  form.setValue(
+                    "analysisType",
+                    value as "comprehensive" | "focused" | "competitive"
+                  )
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -428,7 +478,9 @@ export function AnalysisConfigModal({
               <Label htmlFor="priority">Priority</Label>
               <Select
                 value={form.watch("priority")}
-                onValueChange={(value) => form.setValue("priority", value as "high" | "medium" | "low")}
+                onValueChange={(value) =>
+                  form.setValue("priority", value as "high" | "medium" | "low")
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -447,23 +499,31 @@ export function AnalysisConfigModal({
             <div className="flex items-center space-x-2">
               <Checkbox
                 checked={form.watch("includeCompetitors")}
-                onCheckedChange={(checked) => form.setValue("includeCompetitors", !!checked)}
+                onCheckedChange={(checked) =>
+                  form.setValue("includeCompetitors", !!checked)
+                }
               />
               <Label className="text-sm">Include competitor analysis</Label>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 checked={form.watch("generateReport")}
-                onCheckedChange={(checked) => form.setValue("generateReport", !!checked)}
+                onCheckedChange={(checked) =>
+                  form.setValue("generateReport", !!checked)
+                }
               />
-              <Label className="text-sm">Generate detailed report after analysis</Label>
+              <Label className="text-sm">
+                Generate detailed report after analysis
+              </Label>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 checked={form.watch("scheduleAnalysis")}
-                onCheckedChange={(checked) => form.setValue("scheduleAnalysis", !!checked)}
+                onCheckedChange={(checked) =>
+                  form.setValue("scheduleAnalysis", !!checked)
+                }
               />
               <Label className="text-sm">Schedule for recurring analysis</Label>
             </div>
@@ -482,18 +542,20 @@ export function AnalysisConfigModal({
               type="submit"
               loading={isLoading}
               loadingText={
-                analysisProgress?.status === "running" 
-                  ? "Analysis Running..." 
+                analysisProgress?.status === "running"
+                  ? "Analysis Running..."
                   : "Starting Analysis..."
               }
               icon={<Zap className="h-4 w-4" />}
               disabled={
-                analysisProgress?.status === "running" || 
+                analysisProgress?.status === "running" ||
                 analysisProgress?.status === "completed" ||
                 !websiteId
               }
             >
-              {analysisProgress?.status === "completed" ? "Completed" : "Start Analysis"}
+              {analysisProgress?.status === "completed"
+                ? "Completed"
+                : "Start Analysis"}
             </LoadingButton>
           </DialogFooter>
         </form>

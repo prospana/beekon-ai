@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
-import type { Database } from "@/integrations/supabase/types";
 
 export type AnalysisStatus = "pending" | "running" | "completed" | "failed";
 
@@ -52,7 +51,8 @@ export interface AnalysisProgress {
 
 export class AnalysisService {
   private static instance: AnalysisService;
-  private progressCallbacks: Map<string, (progress: AnalysisProgress) => void> = new Map();
+  private progressCallbacks: Map<string, (progress: AnalysisProgress) => void> =
+    new Map();
 
   public static getInstance(): AnalysisService {
     if (!AnalysisService.instance) {
@@ -64,17 +64,23 @@ export class AnalysisService {
   async createAnalysis(config: AnalysisConfig): Promise<string> {
     try {
       // First, create topics if they don't exist
-      const topicIds = await this.ensureTopicsExist(config.websiteId, config.topics);
-      
+      const topicIds = await this.ensureTopicsExist(
+        config.websiteId,
+        config.topics
+      );
+
       // Create prompts for each topic
-      const promptIds = await this.createPrompts(config.customPrompts, topicIds);
-      
+      const promptIds = await this.createPrompts(
+        config.customPrompts,
+        topicIds
+      );
+
       // Start the analysis process
       const analysisId = await this.startAnalysis(config, promptIds);
-      
+
       // Trigger N8N webhook for actual analysis
       await this.triggerAnalysisWebhook(analysisId, config);
-      
+
       return analysisId;
     } catch (error) {
       console.error("Failed to create analysis:", error);
@@ -82,9 +88,12 @@ export class AnalysisService {
     }
   }
 
-  private async ensureTopicsExist(websiteId: string, topics: string[]): Promise<string[]> {
+  private async ensureTopicsExist(
+    websiteId: string,
+    topics: string[]
+  ): Promise<string[]> {
     const topicIds: string[] = [];
-    
+
     for (const topicName of topics) {
       // Check if topic already exists
       const { data: existingTopic } = await supabase
@@ -94,7 +103,7 @@ export class AnalysisService {
         .eq("website_id", websiteId)
         .eq("topic_name", topicName)
         .single();
-      
+
       if (existingTopic) {
         topicIds.push(existingTopic.id);
       } else {
@@ -109,22 +118,25 @@ export class AnalysisService {
           })
           .select("id")
           .single();
-        
+
         if (error) throw error;
         topicIds.push(newTopic.id);
       }
     }
-    
+
     return topicIds;
   }
 
-  private async createPrompts(customPrompts: string[], topicIds: string[]): Promise<string[]> {
+  private async createPrompts(
+    customPrompts: string[],
+    topicIds: string[]
+  ): Promise<string[]> {
     const promptIds: string[] = [];
-    
+
     for (let i = 0; i < customPrompts.length; i++) {
       const prompt = customPrompts[i];
       const topicId = topicIds[i % topicIds.length]; // Cycle through topics
-      
+
       const { data: newPrompt, error } = await supabase
         .schema("beekon_data")
         .from("prompts")
@@ -137,18 +149,21 @@ export class AnalysisService {
         })
         .select("id")
         .single();
-      
+
       if (error) throw error;
       promptIds.push(newPrompt.id);
     }
-    
+
     return promptIds;
   }
 
-  private async startAnalysis(config: AnalysisConfig, promptIds: string[]): Promise<string> {
+  private async startAnalysis(
+    config: AnalysisConfig,
+    promptIds: string[]
+  ): Promise<string> {
     // Create analysis record (we'll use a UUID as analysis ID)
     const analysisId = crypto.randomUUID();
-    
+
     // Initialize progress tracking
     this.updateProgress(analysisId, {
       analysisId,
@@ -158,20 +173,23 @@ export class AnalysisService {
       completedSteps: 0,
       totalSteps: promptIds.length * config.llmModels.length,
     });
-    
+
     return analysisId;
   }
 
-  private async triggerAnalysisWebhook(analysisId: string, config: AnalysisConfig) {
+  private async triggerAnalysisWebhook(
+    analysisId: string,
+    config: AnalysisConfig
+  ) {
     try {
       const webhookPayload = {
         analysisId,
         config,
         timestamp: new Date().toISOString(),
       };
-      
+
       await sendN8nWebhook("analysis/start", webhookPayload);
-      
+
       this.updateProgress(analysisId, {
         analysisId,
         status: "running",
@@ -194,16 +212,20 @@ export class AnalysisService {
     }
   }
 
-  async getAnalysisResults(websiteId: string, filters?: {
-    topic?: string;
-    llmProvider?: string;
-    status?: AnalysisStatus;
-    dateRange?: { start: string; end: string };
-  }): Promise<AnalysisResult[]> {
+  async getAnalysisResults(
+    websiteId: string,
+    filters?: {
+      topic?: string;
+      llmProvider?: string;
+      status?: AnalysisStatus;
+      dateRange?: { start: string; end: string };
+    }
+  ): Promise<AnalysisResult[]> {
     let query = supabase
       .schema("beekon_data")
       .from("llm_analysis_results")
-      .select(`
+      .select(
+        `
         *,
         prompts!inner (
           prompt_text,
@@ -212,7 +234,8 @@ export class AnalysisService {
             website_id
           )
         )
-      `)
+      `
+      )
       .eq("prompts.topics.website_id", websiteId)
       .order("created_at", { ascending: false });
 
@@ -235,11 +258,14 @@ export class AnalysisService {
 
     // Transform data to match expected format
     const resultsMap = new Map<string, AnalysisResult>();
-    
+
     data?.forEach((row) => {
       const promptId = row.prompt_id;
-      const prompt = row.prompts as { prompt_text: string; topics: { topic_name: string } };
-      
+      const prompt = row.prompts as {
+        prompt_text: string;
+        topics: { topic_name: string };
+      };
+
       if (!resultsMap.has(promptId)) {
         resultsMap.set(promptId, {
           id: promptId,
@@ -253,7 +279,7 @@ export class AnalysisService {
           llm_results: [],
         });
       }
-      
+
       const result = resultsMap.get(promptId)!;
       result.llm_results.push({
         id: row.id,
@@ -270,7 +296,9 @@ export class AnalysisService {
     return Array.from(resultsMap.values());
   }
 
-  async getTopicsForWebsite(websiteId: string): Promise<Array<{ id: string; name: string }>> {
+  async getTopicsForWebsite(
+    websiteId: string
+  ): Promise<Array<{ id: string; name: string }>> {
     const { data, error } = await supabase
       .schema("beekon_data")
       .from("topics")
@@ -278,16 +306,21 @@ export class AnalysisService {
       .eq("website_id", websiteId)
       .eq("is_active", true)
       .order("topic_name");
-    
+
     if (error) throw error;
-    
-    return data?.map(topic => ({
-      id: topic.id,
-      name: topic.topic_name,
-    })) || [];
+
+    return (
+      data?.map((topic) => ({
+        id: topic.id,
+        name: topic.topic_name,
+      })) || []
+    );
   }
 
-  subscribeToProgress(analysisId: string, callback: (progress: AnalysisProgress) => void) {
+  subscribeToProgress(
+    analysisId: string,
+    callback: (progress: AnalysisProgress) => void
+  ) {
     this.progressCallbacks.set(analysisId, callback);
   }
 
@@ -303,7 +336,10 @@ export class AnalysisService {
   }
 
   // This method would be called by webhook handlers or polling
-  async handleAnalysisUpdate(analysisId: string, update: Partial<AnalysisProgress>) {
+  async handleAnalysisUpdate(
+    analysisId: string,
+    update: Partial<AnalysisProgress>
+  ) {
     const callback = this.progressCallbacks.get(analysisId);
     if (callback) {
       const currentProgress = this.getCurrentProgress(analysisId);
@@ -348,14 +384,21 @@ export class AnalysisService {
         confidence_score: result.confidenceScore,
         analyzed_at: new Date().toISOString(),
       });
-    
+
     if (error) throw error;
   }
 
-  async exportAnalysisResults(analysisIds: string[], format: "pdf" | "csv" | "json"): Promise<Blob> {
+  async exportAnalysisResults(
+    analysisIds: string[],
+    format: "pdf" | "csv" | "json"
+  ): Promise<Blob> {
     // This would integrate with the export service
     // For now, returning a mock blob
-    const mockData = JSON.stringify({ analysisIds, format, timestamp: new Date().toISOString() });
+    const mockData = JSON.stringify({
+      analysisIds,
+      format,
+      timestamp: new Date().toISOString(),
+    });
     return new Blob([mockData], { type: "application/json" });
   }
 }

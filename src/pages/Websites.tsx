@@ -27,9 +27,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
-import { useWorkspace, Website } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { Website, useWorkspace } from "@/hooks/useWorkspace";
 import { sendN8nWebhook } from "@/lib/http-request";
 import {
   BarChart3,
