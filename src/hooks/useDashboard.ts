@@ -56,7 +56,7 @@ export function useDashboardMetrics(
   // Memoize filters to prevent infinite loops
   const memoizedFilters = useMemo(
     () => filters,
-    [filters.dateRange, filters.period]
+    [filters.dateRange?.start, filters.dateRange?.end, filters.period]
   );
 
   const loadDashboardData = useCallback(

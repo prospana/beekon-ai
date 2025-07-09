@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -40,6 +41,7 @@ import {
   Plus,
   Settings,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -261,21 +263,100 @@ export default function Websites() {
 
       {/* Empty State */}
       {websites?.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <CardTitle className="mb-2">No websites added yet</CardTitle>
-            <CardDescription className="mb-4">
-              Add your first website to start monitoring its AI visibility
-            </CardDescription>
-            <LoadingButton
-              onClick={() => setIsAddDialogOpen(true)}
-              icon={<Plus className="h-4 w-4" />}
-            >
-              Add Your First Website
-            </LoadingButton>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Primary Empty State */}
+          <EmptyState
+            icon={Globe}
+            title="Start Monitoring Your Websites"
+            description="Add your first website to begin tracking its AI visibility performance across different LLMs and discover how your brand appears in AI responses."
+            size="lg"
+            actions={[
+              {
+                label: "Add Your First Website",
+                onClick: () => setIsAddDialogOpen(true),
+                variant: "default",
+                icon: Plus,
+              },
+              // {
+              //   label: "View Example",
+              //   onClick: () => toast({
+              //     title: "Example Feature",
+              //     description: "Example website analysis would be shown here",
+              //   }),
+              //   variant: "outline",
+              //   icon: Target,
+              // },
+            ]}
+          />
+
+          {/* Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                What We'll Track
+              </CardTitle>
+              <CardDescription>
+                Comprehensive AI visibility analysis for your website
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                  <div>
+                    <h4 className="font-medium text-sm">Brand Mentions</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Track how often your brand is mentioned in AI responses
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                  <div>
+                    <h4 className="font-medium text-sm">Ranking Analysis</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Monitor your position in AI recommendation lists
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                  <div>
+                    <h4 className="font-medium text-sm">Topic Performance</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Analyze visibility across different topics and keywords
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                  <div>
+                    <h4 className="font-medium text-sm">Sentiment Tracking</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Monitor how your brand is perceived in AI responses
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setIsAddDialogOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Get Started
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Websites Grid */}
