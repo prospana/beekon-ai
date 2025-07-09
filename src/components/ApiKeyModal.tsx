@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { apiKeyService, ApiKey as ApiKeyType, ApiKeyUsage } from "@/services/apiKeyService";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import {
   Key,
@@ -31,9 +33,10 @@ import {
 interface ApiKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onApiKeyChange?: () => void;
 }
 
-interface ApiKey {
+interface DisplayApiKey {
   id: string;
   name: string;
   key: string;
@@ -43,35 +46,64 @@ interface ApiKey {
   status: "active" | "revoked";
 }
 
-export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
+export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [showKey, setShowKey] = useState<{ [key: string]: boolean }>({});
   const [newKeyName, setNewKeyName] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [keyToRevoke, setKeyToRevoke] = useState<string | null>(null);
+  const [usage, setUsage] = useState<ApiKeyUsage>({
+    total_requests: 0,
+    success_rate: 0,
+    active_keys: 0,
+    last_30_days: 0,
+  });
 
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([
-    {
-      id: "1",
-      name: "Production API",
-      key: "bk_prod_1234567890abcdef1234567890abcdef",
-      created: "2024-01-15",
-      lastUsed: "2024-01-07",
-      requests: 1247,
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Development API",
-      key: "bk_dev_abcdef1234567890abcdef1234567890",
-      created: "2024-01-10",
-      lastUsed: "2024-01-06",
-      requests: 324,
-      status: "active",
-    },
+  const [apiKeys, setApiKeys] = useState<DisplayApiKey[]>([
   ]);
+
+  // Load API keys and usage on component mount
+  useEffect(() => {
+    const loadApiKeys = async () => {
+      if (!user?.id || !isOpen) return;
+      
+      setIsLoading(true);
+      try {
+        const [keys, usageData] = await Promise.all([
+          apiKeyService.getApiKeys(user.id),
+          apiKeyService.getApiKeyUsage(user.id),
+        ]);
+        
+        const displayKeys: DisplayApiKey[] = keys.map(key => ({
+          id: key.id,
+          name: key.name,
+          key: key.key_prefix + '...' + key.key_hash.substring(0, 8), // We can't show the full key
+          created: key.created_at,
+          lastUsed: key.last_used_at || 'Never',
+          requests: key.usage_count,
+          status: key.is_active ? 'active' : 'revoked',
+        }));
+        
+        setApiKeys(displayKeys);
+        setUsage(usageData);
+      } catch (error) {
+        console.error('Failed to load API keys:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load API keys.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadApiKeys();
+  }, [user?.id, isOpen, toast]);
 
   const handleGenerateKey = async () => {
     if (!newKeyName.trim()) {
@@ -83,32 +115,42 @@ export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
       return;
     }
 
+    if (!user?.id) return;
+
     setIsGenerating(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const newKey: ApiKey = {
-        id: Date.now().toString(),
-        name: newKeyName,
-        key: `bk_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
-        created: new Date().toISOString().split('T')[0],
-        lastUsed: "Never",
-        requests: 0,
-        status: "active",
+      const newKeyWithSecret = await apiKeyService.generateApiKey(user.id, newKeyName);
+      
+      const displayKey: DisplayApiKey = {
+        id: newKeyWithSecret.id,
+        name: newKeyWithSecret.name,
+        key: newKeyWithSecret.key, // Show full key only for newly generated keys
+        created: newKeyWithSecret.created_at,
+        lastUsed: newKeyWithSecret.last_used_at || 'Never',
+        requests: newKeyWithSecret.usage_count,
+        status: newKeyWithSecret.is_active ? 'active' : 'revoked',
       };
 
-      setApiKeys(prev => [newKey, ...prev]);
+      setApiKeys(prev => [displayKey, ...prev]);
       setNewKeyName("");
+      setShowKey(prev => ({ ...prev, [newKeyWithSecret.id]: true })); // Show the newly generated key
+      
+      // Update usage stats
+      const updatedUsage = await apiKeyService.getApiKeyUsage(user.id);
+      setUsage(updatedUsage);
+      
+      // Notify parent component
+      onApiKeyChange?.();
 
       toast({
         title: "API key generated",
         description: "Your new API key has been created successfully. Make sure to copy it now!",
       });
     } catch (error) {
+      console.error('Failed to generate API key:', error);
       toast({
         title: "Error",
-        description: "Failed to generate API key. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to generate API key. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -117,22 +159,31 @@ export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
   };
 
   const handleRevokeKey = async (keyId: string) => {
+    if (!user?.id) return;
+    
     setIsRevoking(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await apiKeyService.revokeApiKey(user.id, keyId);
 
       setApiKeys(prev => 
         prev.map(key => 
           key.id === keyId ? { ...key, status: "revoked" as const } : key
         )
       );
+      
+      // Update usage stats
+      const updatedUsage = await apiKeyService.getApiKeyUsage(user.id);
+      setUsage(updatedUsage);
+      
+      // Notify parent component
+      onApiKeyChange?.();
 
       toast({
         title: "API key revoked",
         description: "The API key has been successfully revoked.",
       });
     } catch (error) {
+      console.error('Failed to revoke API key:', error);
       toast({
         title: "Error",
         description: "Failed to revoke API key. Please try again.",
@@ -198,15 +249,15 @@ export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">1,571</div>
+                    <div className="text-2xl font-bold text-primary">{usage.total_requests.toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Total Requests</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-success">99.2%</div>
+                    <div className="text-2xl font-bold text-success">{usage.success_rate.toFixed(1)}%</div>
                     <div className="text-sm text-muted-foreground">Success Rate</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold">2</div>
+                    <div className="text-2xl font-bold">{usage.active_keys}</div>
                     <div className="text-sm text-muted-foreground">Active Keys</div>
                   </div>
                 </div>
@@ -263,8 +314,18 @@ export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {apiKeys.map((apiKey) => (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {apiKeys.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No API keys found. Generate your first API key above.
+                      </div>
+                    ) : (
+                      apiKeys.map((apiKey) => (
                     <div key={apiKey.id} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
@@ -325,8 +386,10 @@ export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

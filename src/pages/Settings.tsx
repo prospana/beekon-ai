@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/ui/loading-button';
@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { profileService, UserProfile } from '@/services/profileService';
+import { apiKeyService, ApiKey } from '@/services/apiKeyService';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
 import { Settings as SettingsIcon, User, Bell, Shield, Save, Lock, Key } from 'lucide-react';
 
@@ -17,11 +19,13 @@ export default function Settings() {
   const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [isPasswordUpdating, setIsPasswordUpdating] = useState(false);
   const [isApiModalOpen, setIsApiModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Form state for profile
-  const [firstName, setFirstName] = useState('John');
-  const [lastName, setLastName] = useState('Doe');
-  const [company, setCompany] = useState('Beekon.ai');
+  // Profile state
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [company, setCompany] = useState('');
   
   // Form state for password
   const [currentPassword, setCurrentPassword] = useState('');
@@ -34,17 +38,68 @@ export default function Settings() {
   const [competitorAlerts, setCompetitorAlerts] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(true);
   
+  // API keys state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [primaryApiKey, setPrimaryApiKey] = useState<string>('');
+  
+  // Load profile data on component mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const userProfile = await profileService.getProfile(user.id);
+        if (userProfile) {
+          setProfile(userProfile);
+          setFirstName(userProfile.first_name || '');
+          setLastName(userProfile.last_name || '');
+          setCompany(userProfile.company || '');
+          setEmailNotifications(userProfile.notification_settings.email_notifications);
+          setWeeklyReports(userProfile.notification_settings.weekly_reports);
+          setCompetitorAlerts(userProfile.notification_settings.competitor_alerts);
+          setAnalysisComplete(userProfile.notification_settings.analysis_complete);
+        }
+        
+        // Load API keys
+        const userApiKeys = await apiKeyService.getApiKeys(user.id);
+        setApiKeys(userApiKeys);
+        if (userApiKeys.length > 0) {
+          setPrimaryApiKey(userApiKeys[0].key_prefix + '...');
+        }
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load profile data.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadProfile();
+  }, [user?.id, toast]);
+  
   const handleProfileSave = async () => {
+    if (!user?.id) return;
+    
     setIsProfileSaving(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const updatedProfile = await profileService.updateProfile(user.id, {
+        first_name: firstName,
+        last_name: lastName,
+        company: company,
+      });
+      
+      setProfile(updatedProfile);
       
       toast({
         title: 'Profile updated',
         description: 'Your profile has been updated successfully.',
       });
     } catch (error) {
+      console.error('Failed to update profile:', error);
       toast({
         title: 'Error',
         description: 'Failed to update profile. Please try again.',
@@ -74,10 +129,18 @@ export default function Settings() {
       return;
     }
     
+    if (newPassword.length < 6) {
+      toast({
+        title: 'Error',
+        description: 'New password must be at least 6 characters long.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsPasswordUpdating(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await profileService.changePassword(currentPassword, newPassword);
       
       toast({
         title: 'Password updated',
@@ -89,13 +152,49 @@ export default function Settings() {
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
+      console.error('Failed to update password:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update password. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to update password. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setIsPasswordUpdating(false);
+    }
+  };
+  
+  const handleNotificationChange = async (setting: 'email_notifications' | 'weekly_reports' | 'competitor_alerts' | 'analysis_complete', value: boolean) => {
+    if (!user?.id || !profile) return;
+    
+    try {
+      const updatedProfile = await profileService.updateNotificationSettings(user.id, {
+        [setting]: value,
+      });
+      
+      setProfile(updatedProfile);
+      
+      // Update local state
+      switch (setting) {
+        case 'email_notifications':
+          setEmailNotifications(value);
+          break;
+        case 'weekly_reports':
+          setWeeklyReports(value);
+          break;
+        case 'competitor_alerts':
+          setCompetitorAlerts(value);
+          break;
+        case 'analysis_complete':
+          setAnalysisComplete(value);
+          break;
+      }
+    } catch (error) {
+      console.error('Failed to update notification settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update notification settings.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -108,8 +207,14 @@ export default function Settings() {
             Manage your account settings and preferences
           </p>
         </div>
-
-      {/* Profile Settings */}
+        
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <>
+            {/* Profile Settings */}
       <Card>
         <CardHeader>
           <div className="flex items-center space-x-2">
@@ -143,7 +248,7 @@ export default function Settings() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={user?.email || ''} disabled />
+            <Input id="email" type="email" value={profile?.email || user?.email || ''} disabled />
           </div>
           <div className="space-y-2">
             <Label htmlFor="company">Company</Label>
@@ -186,7 +291,7 @@ export default function Settings() {
             </div>
             <Switch 
               checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
+              onCheckedChange={(value) => handleNotificationChange('email_notifications', value)}
             />
           </div>
           
@@ -201,7 +306,7 @@ export default function Settings() {
             </div>
             <Switch 
               checked={weeklyReports}
-              onCheckedChange={setWeeklyReports}
+              onCheckedChange={(value) => handleNotificationChange('weekly_reports', value)}
             />
           </div>
           
@@ -216,7 +321,7 @@ export default function Settings() {
             </div>
             <Switch 
               checked={competitorAlerts}
-              onCheckedChange={setCompetitorAlerts}
+              onCheckedChange={(value) => handleNotificationChange('competitor_alerts', value)}
             />
           </div>
           
@@ -231,7 +336,7 @@ export default function Settings() {
             </div>
             <Switch 
               checked={analysisComplete}
-              onCheckedChange={setAnalysisComplete}
+              onCheckedChange={(value) => handleNotificationChange('analysis_complete', value)}
             />
           </div>
         </CardContent>
@@ -302,7 +407,7 @@ export default function Settings() {
           <div className="space-y-2">
             <Label htmlFor="apiKey">API Key</Label>
             <div className="flex gap-3">
-              <Input id="apiKey" value="bk_..." disabled className="font-mono" />
+              <Input id="apiKey" value={primaryApiKey || 'No API key'} disabled className="font-mono" />
               <Button 
                 variant="outline"
                 onClick={() => setIsApiModalOpen(true)}
@@ -317,11 +422,26 @@ export default function Settings() {
           </p>
         </CardContent>
       </Card>
+          </>
+        )}
       </div>
       
       <ApiKeyModal 
         isOpen={isApiModalOpen}
         onClose={() => setIsApiModalOpen(false)}
+        onApiKeyChange={() => {
+          // Refresh API keys when modal closes
+          if (user?.id) {
+            apiKeyService.getApiKeys(user.id).then(keys => {
+              setApiKeys(keys);
+              if (keys.length > 0) {
+                setPrimaryApiKey(keys[0].key_prefix + '...');
+              } else {
+                setPrimaryApiKey('');
+              }
+            });
+          }
+        }}
       />
     </>
   );
