@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -7,9 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -25,56 +23,39 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
+import { useWorkspace, Website } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { sendN8nWebhook } from "@/lib/http-request";
 import {
-  Plus,
-  Globe,
-  MoreHorizontal,
-  Settings,
-  Trash2,
   BarChart3,
   Calendar,
+  Globe,
+  MoreHorizontal,
+  Play,
+  Plus,
+  Settings,
+  Trash2,
 } from "lucide-react";
-import { sendN8nWebhook } from "@/lib/http-request";
-import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
 
 export default function Websites() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [domain, setDomain] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [websiteToDelete, setWebsiteToDelete] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
-
-  // Mock data
-  const websites = [
-    {
-      id: 1,
-      domain: "example.com",
-      displayName: "Example Corp",
-      status: "active",
-      lastAnalyzed: "2024-01-07",
-      totalTopics: 12,
-      avgVisibility: 78,
-    },
-    {
-      id: 2,
-      domain: "mycompany.io",
-      displayName: "My Company",
-      status: "pending",
-      lastAnalyzed: "2024-01-05",
-      totalTopics: 8,
-      avgVisibility: 65,
-    },
-    {
-      id: 3,
-      domain: "startup.tech",
-      displayName: "Tech Startup",
-      status: "active",
-      lastAnalyzed: "2024-01-06",
-      totalTopics: 15,
-      avgVisibility: 82,
-    },
-  ];
+  const { websites, deleteWebsite } = useWorkspace();
+  const { workspaceId } = useAuth();
 
   // Add `https://` if it doesn't exists
   const addProtocol = (domain: string) => {
@@ -83,11 +64,20 @@ export default function Websites() {
   };
 
   const handleAddWebsite = async () => {
-    console.log("user", user);
+    setProcessing(true);
     if (!domain) {
       toast({
         title: "Error",
         description: "Please enter a domain name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!displayName) {
+      toast({
+        title: "Error",
+        description: "Please enter a display name",
         variant: "destructive",
       });
       return;
@@ -106,15 +96,16 @@ export default function Websites() {
       return;
     }
 
-    const response = await sendN8nWebhook("webhook-test/website-onboarding", {
+    const response = await sendN8nWebhook("webhook/website-onboarding", {
       website: addProtocol(domain),
       display_name: displayName,
+      workspace_id: workspaceId,
     });
 
     if (!response.success) {
       toast({
         title: "Error",
-        description: "Please unable to crawl website.",
+        description: "Website crawl failed. Website not found.",
         variant: "destructive",
       });
       return;
@@ -126,20 +117,77 @@ export default function Websites() {
       description: `Analysis started for ${domain}`,
     });
 
-    // setDomain("");
-    // setDisplayName("");
-    // setIsAddDialogOpen(false);
+    setDomain("");
+    setDisplayName("");
+    setProcessing(false);
+    setIsAddDialogOpen(false);
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "active":
-        return <Badge className="bg-success">Active</Badge>;
+      case "completed":
+        return <Badge className="bg-primary">Completed</Badge>;
       case "pending":
         return <Badge variant="secondary">Pending</Badge>;
+      case "crawling":
+        return <Badge variant="secondary">Crawling</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="destructive">Failed</Badge>;
     }
+  };
+
+  const handleOpenSettings = (website: Website) => {
+    setSelectedWebsite(website);
+    setIsSettingsModalOpen(true);
+  };
+
+  const handleCloseSettings = () => {
+    setIsSettingsModalOpen(false);
+    setSelectedWebsite(null);
+  };
+
+  const handleAnalyzeNow = async (websiteId: string, domain: string) => {
+    setIsAnalyzing(websiteId);
+    if (!websiteId) {
+      toast({
+        title: "Error",
+        description: "Website not found.",
+        variant: "destructive",
+      });
+    }
+
+    const response = await sendN8nWebhook("webhook/re-analyze", {
+      id: websiteId,
+      website: domain,
+    });
+
+    if (!response.success) {
+      toast({
+        title: "Error",
+        description: "There was an error during re-analysis.",
+        variant: "destructive",
+      });
+
+      setIsAnalyzing(null);
+      return;
+    }
+
+    toast({
+      title: "Website added!",
+      description: `We're in the process of analyzing ${domain}`,
+    });
+    setIsAnalyzing(null);
+  };
+
+  const handleDeleteWebsite = async (websiteId: string) => {
+    deleteWebsite(websiteId);
+  };
+
+  const confirmDelete = (websiteId: string) => {
+    setWebsiteToDelete(websiteId);
+    setShowDeleteConfirm(true);
   };
 
   return (
@@ -193,14 +241,21 @@ export default function Websites() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleAddWebsite}>Start Analysis</Button>
+              <LoadingButton
+                onClick={handleAddWebsite}
+                loading={processing}
+                loadingText="Starting..."
+                icon={<Play className="h-4 w-4" />}
+              >
+                Start Analysis
+              </LoadingButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       {/* Empty State */}
-      {websites.length === 0 && (
+      {websites?.length === 0 && (
         <Card className="text-center py-12">
           <CardContent>
             <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -208,17 +263,19 @@ export default function Websites() {
             <CardDescription className="mb-4">
               Add your first website to start monitoring its AI visibility
             </CardDescription>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
+            <LoadingButton
+              onClick={() => setIsAddDialogOpen(true)}
+              icon={<Plus className="h-4 w-4" />}
+            >
               Add Your First Website
-            </Button>
+            </LoadingButton>
           </CardContent>
         </Card>
       )}
 
       {/* Websites Grid */}
       <div className="grid gap-6">
-        {websites.map((website) => (
+        {websites?.map((website) => (
           <Card key={website.id}>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -228,13 +285,13 @@ export default function Websites() {
                   </div>
                   <div>
                     <CardTitle className="text-lg">
-                      {website.displayName || website.domain}
+                      {website.display_name || website.domain}
                     </CardTitle>
                     <CardDescription>{website.domain}</CardDescription>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {getStatusBadge(website.status)}
+                  {getStatusBadge(website.crawl_status!)}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm">
@@ -242,15 +299,27 @@ export default function Websites() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleAnalyzeNow(website.id, website.domain)
+                        }
+                        disabled={isAnalyzing === website.id}
+                      >
                         <BarChart3 className="h-4 w-4 mr-2" />
-                        Analyze Now
+                        {isAnalyzing === website.id
+                          ? "Analyzing..."
+                          : "Analyze Now"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleOpenSettings(website)}
+                      >
                         <Settings className="h-4 w-4 mr-2" />
                         Settings
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => confirmDelete(website.id)}
+                      >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
                       </DropdownMenuItem>
@@ -266,7 +335,9 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Last Analyzed</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(website.lastAnalyzed).toLocaleDateString()}
+                      {website.last_crawled_at
+                        ? new Date(website.created_at).toLocaleDateString()
+                        : new Date(website.created_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -275,7 +346,7 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Total Topics</p>
                     <p className="text-sm text-muted-foreground">
-                      {website.totalTopics}
+                      {/* {website.totalTopics} // TODO: create feature to get topics in workspace context*/}
                     </p>
                   </div>
                 </div>
@@ -284,7 +355,7 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Avg Visibility</p>
                     <p className="text-sm text-muted-foreground">
-                      {website.avgVisibility}%
+                      {/* {website.avgVisibility}% TODO: create feature to get avg visibility in workspace context */}
                     </p>
                   </div>
                 </div>
@@ -293,6 +364,32 @@ export default function Websites() {
           </Card>
         ))}
       </div>
+
+      {/* Website Settings Modal */}
+      <WebsiteSettingsModal
+        // website={selectedWebsite // TODO: need to work on selected websites}
+        website={null}
+        isOpen={isSettingsModalOpen}
+        onClose={handleCloseSettings}
+      />
+
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setWebsiteToDelete(null);
+        }}
+        onConfirm={() => {
+          if (websiteToDelete !== null) {
+            return handleDeleteWebsite(websiteToDelete);
+          }
+          return;
+        }}
+        title="Delete Website"
+        description="Are you sure you want to delete this website? This will remove all associated analysis data and cannot be undone."
+        confirmText="Delete Website"
+        variant="destructive"
+      />
     </div>
   );
 }

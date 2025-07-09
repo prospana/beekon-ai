@@ -1,11 +1,12 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { Session, User } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState } from "react";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  workspaceId: string | null;
   signUp: (email: string, password: string) => Promise<{ error: unknown }>;
   signIn: (email: string, password: string) => Promise<{ error: unknown }>;
   signOut: () => Promise<void>;
@@ -17,12 +18,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     // Set up auth state listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((_, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -35,8 +37,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
+    if (user?.id) {
+      supabase
+        .schema("beekon_data")
+        .from("workspaces")
+        .select(`id`)
+        .eq("owner_id", user.id)
+        .limit(1)
+        .single()
+        .then((res) => {
+          if (res.data) {
+            setWorkspaceId(res.data.id);
+          } else {
+            setWorkspaceId(null);
+          }
+        });
+    } else {
+      setWorkspaceId(null);
+    }
+
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user?.id]);
 
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
@@ -48,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailRedirectTo: redirectUrl,
       },
     });
+
     return { error };
   };
 
@@ -66,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     session,
+    workspaceId,
     loading,
     signUp,
     signIn,
@@ -75,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

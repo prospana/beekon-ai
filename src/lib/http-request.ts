@@ -5,15 +5,15 @@ const n8nUrl = import.meta.env.VITE_N8N_URL;
 const n8nAuthUser = import.meta.env.VITE_BASIC_USER;
 const n8nAuthPass = import.meta.env.VITE_BASIC_PASS;
 
-export function noTrailingSlash(website: string) {
-  return website.replace(/\/+$/, "");
-}
-
 export type HttpResponse = {
   success: boolean;
   messages: string[];
   data: unknown;
 };
+
+export function noTrailingSlash(website: string) {
+  return website.replace(/\/+$/, "");
+}
 
 export async function sendN8nWebhook(
   endpoint: string,
@@ -64,7 +64,7 @@ export async function httpRequest(
 
     return {
       success: false,
-      messages: [error],
+      messages: [error instanceof Error ? error.message : String(error)],
       data: data,
     };
   }

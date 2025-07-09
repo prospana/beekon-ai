@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Users, MoreHorizontal, Trash2, Globe, TrendingUp, TrendingDown } from 'lucide-react';
 
@@ -27,10 +29,13 @@ export default function Competitors() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [competitorDomain, setCompetitorDomain] = useState('');
   const [competitorName, setCompetitorName] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [competitorToDelete, setCompetitorToDelete] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Mock data
-  const competitors = [
+  // Mock data with state for dynamic updates
+  const [competitors, setCompetitors] = useState([
     {
       id: 1,
       domain: 'competitor1.com',
@@ -55,7 +60,7 @@ export default function Competitors() {
       avgRank: 3.2,
       trend: 'up'
     },
-  ];
+  ]);
 
   const shareOfVoiceData = [
     { name: 'Your Brand', value: 42, fill: 'hsl(var(--primary))' },
@@ -72,7 +77,7 @@ export default function Competitors() {
     { topic: 'Data Analytics', yourBrand: 91, competitor1: 74, competitor2: 69, competitor3: 77 },
   ];
 
-  const handleAddCompetitor = () => {
+  const handleAddCompetitor = async () => {
     if (!competitorDomain) {
       toast({
         title: 'Error',
@@ -82,25 +87,76 @@ export default function Competitors() {
       return;
     }
 
-    toast({
-      title: 'Competitor added!',
-      description: `Started tracking ${competitorDomain}`,
-    });
+    setIsAdding(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const newCompetitor = {
+        id: Date.now(),
+        domain: competitorDomain,
+        name: competitorName || competitorDomain,
+        shareOfVoice: Math.floor(Math.random() * 20) + 10,
+        avgRank: parseFloat((Math.random() * 3 + 1).toFixed(1)),
+        trend: Math.random() > 0.5 ? 'up' : 'down'
+      };
+      
+      setCompetitors(prev => [...prev, newCompetitor]);
+      
+      toast({
+        title: 'Competitor added!',
+        description: `Started tracking ${competitorDomain}`,
+      });
 
-    setCompetitorDomain('');
-    setCompetitorName('');
-    setIsAddDialogOpen(false);
+      setCompetitorDomain('');
+      setCompetitorName('');
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to add competitor. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAdding(false);
+    }
+  };
+  
+  const handleDeleteCompetitor = async (competitorId: number) => {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setCompetitors(prev => prev.filter(comp => comp.id !== competitorId));
+      
+      toast({
+        title: 'Competitor removed',
+        description: 'The competitor has been removed from tracking.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to remove competitor. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const confirmDelete = (competitorId: number) => {
+    setCompetitorToDelete(competitorId);
+    setShowDeleteConfirm(true);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Competitors</h1>
-          <p className="text-muted-foreground">
-            Monitor your competitive landscape in AI responses
-          </p>
-        </div>
+    <>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Competitors</h1>
+            <p className="text-muted-foreground">
+              Monitor your competitive landscape in AI responses
+            </p>
+          </div>
         
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -137,10 +193,21 @@ export default function Competitors() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={isAdding}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleAddCompetitor}>Add Competitor</Button>
+              <LoadingButton 
+                onClick={handleAddCompetitor}
+                loading={isAdding}
+                loadingText="Adding..."
+                icon={<Plus className="h-4 w-4" />}
+              >
+                Add Competitor
+              </LoadingButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -218,7 +285,10 @@ export default function Competitors() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem 
+                        className="text-destructive"
+                        onClick={() => confirmDelete(competitor.id)}
+                      >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Remove
                       </DropdownMenuItem>
@@ -264,13 +334,29 @@ export default function Competitors() {
             <CardDescription className="mb-4">
               Add competitors to start monitoring your competitive landscape
             </CardDescription>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
+            <LoadingButton
+              onClick={() => setIsAddDialogOpen(true)}
+              icon={<Plus className="h-4 w-4" />}
+            >
               Add Your First Competitor
-            </Button>
+            </LoadingButton>
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+      
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setCompetitorToDelete(null);
+        }}
+        onConfirm={() => competitorToDelete && handleDeleteCompetitor(competitorToDelete)}
+        title="Remove Competitor"
+        description="Are you sure you want to remove this competitor from tracking? This action cannot be undone."
+        confirmText="Remove Competitor"
+        variant="destructive"
+      />
+    </>
   );
 }
