@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,8 +24,11 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Zap, Plus, X } from "lucide-react";
+import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
+import { analysisService, type AnalysisProgress } from "@/services/analysisService";
+import { Search, Zap, Plus, X, AlertCircle, CheckCircle } from "lucide-react";
 
 const analysisConfigSchema = z.object({
   analysisName: z.string().min(1, "Analysis name is required"),
@@ -53,9 +56,12 @@ export function AnalysisConfigModal({
   websiteId,
 }: AnalysisConfigModalProps) {
   const { toast } = useToast();
+  const { consumeCredit } = useSubscriptionEnforcement();
   const [isLoading, setIsLoading] = useState(false);
   const [customTopic, setCustomTopic] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
 
   const availableTopics = [
     "AI Tools",
@@ -91,26 +97,93 @@ export function AnalysisConfigModal({
   });
 
   const onSubmit = async (data: AnalysisConfigFormData) => {
+    if (!websiteId) {
+      toast({
+        title: "Error",
+        description: "Please select a website to analyze.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Check if user can consume credits
+      const canConsume = await consumeCredit();
+      if (!canConsume) {
+        return;
+      }
+
+      // Create analysis configuration
+      const config = {
+        analysisName: data.analysisName,
+        websiteId,
+        topics: data.topics,
+        customPrompts: data.customPrompts,
+        llmModels: data.llmModels,
+        priority: data.priority,
+        analysisType: data.analysisType,
+        includeCompetitors: data.includeCompetitors,
+        generateReport: data.generateReport,
+        scheduleAnalysis: data.scheduleAnalysis,
+      };
+
+      // Start the analysis
+      const analysisId = await analysisService.createAnalysis(config);
+      setCurrentAnalysisId(analysisId);
+
+      // Subscribe to progress updates
+      analysisService.subscribeToProgress(analysisId, (progress) => {
+        setAnalysisProgress(progress);
+        
+        if (progress.status === "completed") {
+          toast({
+            title: "Analysis completed!",
+            description: `${data.analysisName} analysis has been completed successfully.`,
+          });
+          
+          // Reset form and close modal after a delay
+          setTimeout(() => {
+            handleClose();
+          }, 2000);
+        } else if (progress.status === "failed") {
+          toast({
+            title: "Analysis failed",
+            description: progress.error || "The analysis failed to complete. Please try again.",
+            variant: "destructive",
+          });
+          
+          setTimeout(() => {
+            handleClose();
+          }, 2000);
+        }
+      });
       
       toast({
         title: "Analysis started!",
         description: `${data.analysisName} analysis has been queued and will begin shortly.`,
       });
       
-      onClose();
     } catch (error) {
+      console.error("Failed to start analysis:", error);
       toast({
         title: "Error",
         description: "Failed to start analysis. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleClose = () => {
+    if (currentAnalysisId) {
+      analysisService.unsubscribeFromProgress(currentAnalysisId);
+      setCurrentAnalysisId(null);
+    }
+    setAnalysisProgress(null);
+    setIsLoading(false);
+    form.reset();
+    onClose();
   };
 
   const addCustomTopic = () => {
@@ -149,7 +222,7 @@ export function AnalysisConfigModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-3">
@@ -160,6 +233,43 @@ export function AnalysisConfigModal({
             Set up a new analysis to monitor your brand mentions across AI platforms
           </DialogDescription>
         </DialogHeader>
+
+        {/* Progress Tracking */}
+        {analysisProgress && (
+          <div className="mb-4 p-4 border rounded-lg bg-muted/50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-2">
+                {analysisProgress.status === "completed" ? (
+                  <CheckCircle className="h-4 w-4 text-success" />
+                ) : analysisProgress.status === "failed" ? (
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                ) : (
+                  <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                )}
+                <span className="font-medium">
+                  {analysisProgress.status === "completed" ? "Analysis Complete" :
+                   analysisProgress.status === "failed" ? "Analysis Failed" :
+                   "Analysis Running"}
+                </span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {analysisProgress.completedSteps} / {analysisProgress.totalSteps}
+              </span>
+            </div>
+            
+            <Progress value={analysisProgress.progress} className="mb-2" />
+            
+            <p className="text-sm text-muted-foreground">
+              {analysisProgress.currentStep}
+            </p>
+            
+            {analysisProgress.error && (
+              <p className="text-sm text-destructive mt-2">
+                {analysisProgress.error}
+              </p>
+            )}
+          </div>
+        )}
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Analysis Name */}
@@ -363,18 +473,27 @@ export function AnalysisConfigModal({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
-              disabled={isLoading}
+              onClick={handleClose}
+              disabled={isLoading && analysisProgress?.status === "running"}
             >
-              Cancel
+              {analysisProgress?.status === "running" ? "Running..." : "Cancel"}
             </Button>
             <LoadingButton
               type="submit"
               loading={isLoading}
-              loadingText="Starting Analysis..."
+              loadingText={
+                analysisProgress?.status === "running" 
+                  ? "Analysis Running..." 
+                  : "Starting Analysis..."
+              }
               icon={<Zap className="h-4 w-4" />}
+              disabled={
+                analysisProgress?.status === "running" || 
+                analysisProgress?.status === "completed" ||
+                !websiteId
+              }
             >
-              Start Analysis
+              {analysisProgress?.status === "completed" ? "Completed" : "Start Analysis"}
             </LoadingButton>
           </DialogFooter>
         </form>

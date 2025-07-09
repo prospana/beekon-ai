@@ -12,7 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { analysisService } from "@/services/analysisService";
 import {
   ExternalLink,
   Download,
@@ -24,10 +26,14 @@ import {
   Copy,
   Share,
   BarChart3,
+  FileText,
+  Table,
+  Code,
+  ChevronDown,
 } from "lucide-react";
 
 interface AnalysisResult {
-  id: number;
+  id: string;
   prompt: string;
   chatgpt: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
   claude: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
@@ -56,16 +62,28 @@ export function DetailedAnalysisModal({
   if (!analysisResult) return null;
 
   const handleExport = async (format: "pdf" | "csv" | "json") => {
+    if (!analysisResult) return;
+    
     setIsExporting(true);
     try {
-      // Simulate export
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const blob = await analysisService.exportAnalysisResults([analysisResult.id], format);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analysis-${analysisResult.id}-${Date.now()}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
       
       toast({
         title: "Export successful",
         description: `Analysis data exported as ${format.toUpperCase()}`,
       });
     } catch (error) {
+      console.error("Export failed:", error);
       toast({
         title: "Export failed",
         description: "Failed to export analysis data. Please try again.",
@@ -352,26 +370,48 @@ export function DetailedAnalysisModal({
 
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex space-x-2">
-            <LoadingButton
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <LoadingButton
+                  variant="outline"
+                  size="sm"
+                  loading={isExporting}
+                  loadingText="Exporting..."
+                  icon={<Download className="h-4 w-4" />}
+                >
+                  Export
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </LoadingButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("csv")}>
+                  <Table className="h-4 w-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("json")}>
+                  <Code className="h-4 w-4 mr-2" />
+                  Export as JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            <Button
               variant="outline"
               size="sm"
-              loading={isExporting}
-              loadingText="Exporting..."
-              onClick={() => handleExport("pdf")}
-              icon={<Download className="h-4 w-4" />}
+              onClick={() => copyToClipboard(analysisResult.prompt)}
             >
-              Export PDF
-            </LoadingButton>
-            <LoadingButton
-              variant="outline"
-              size="sm"
-              loading={isExporting}
-              loadingText="Exporting..."
-              onClick={() => handleExport("csv")}
-              icon={<Download className="h-4 w-4" />}
-            >
-              Export CSV
-            </LoadingButton>
+              <Copy className="h-4 w-4 mr-2" />
+              Copy Prompt
+            </Button>
+            
+            <Button variant="outline" size="sm">
+              <Share className="h-4 w-4 mr-2" />
+              Share
+            </Button>
           </div>
           <Button onClick={onClose}>Close</Button>
         </div>
