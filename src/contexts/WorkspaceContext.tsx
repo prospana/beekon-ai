@@ -1,13 +1,13 @@
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
-  useCallback,
 } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 export type SubscriptionTier =
   | "free"
@@ -27,10 +27,25 @@ export interface Workspace {
   updated_at: string | null;
 }
 
+export interface Website {
+  id: string;
+  workspace_id: string;
+  domain: string;
+  display_name: string;
+  crawl_status: string | null;
+  last_crawled_at: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkspaceContextType {
   currentWorkspace: Workspace | null;
   workspaces: Workspace[];
   loading: boolean;
+  websites: Website[] | null;
+  deleteWebsite: (websiteId: string) => Promise<void>;
+  refetchWebsites: () => Promise<void>;
   createWorkspace: (
     name: string,
     subscriptionTier: SubscriptionTier,
@@ -56,6 +71,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     null
   );
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchWorkspaces = useCallback(async () => {
@@ -74,12 +90,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      const workspaceData = data || [];
+      const workspaceData = (data || []).map((w) => ({
+        ...w,
+        subscription_tier: w.subscription_tier as SubscriptionTier | null,
+        settings: (w.settings ?? null) as Record<string, unknown> | null,
+      }));
       setWorkspaces(workspaceData);
 
       // Set current workspace to the first one if none is selected and workspaces exist
       if (workspaceData.length > 0 && !currentWorkspace) {
-        setCurrentWorkspace(workspaceData[0]);
+        setCurrentWorkspace(workspaceData[0] ?? null);
       } else if (workspaceData.length === 0) {
         // Ensure currentWorkspace is null when no workspaces exist
         setCurrentWorkspace(null);
@@ -90,7 +110,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         currentWorkspace &&
         !workspaceData.find((w) => w.id === currentWorkspace.id)
       ) {
-        setCurrentWorkspace(workspaceData.length > 0 ? workspaceData[0] : null);
+        setCurrentWorkspace(
+          workspaceData.length > 0 ? workspaceData[0] ?? null : null
+        );
       }
     } catch (error) {
       console.error("Error fetching workspaces:", error);
@@ -129,11 +151,30 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       const newWorkspace = data;
-      setWorkspaces((prev) => [...prev, newWorkspace]);
+      setWorkspaces((prev) => [
+        ...prev,
+        {
+          ...newWorkspace,
+          subscription_tier:
+            newWorkspace.subscription_tier as SubscriptionTier | null,
+          settings: (newWorkspace.settings ?? null) as Record<
+            string,
+            unknown
+          > | null,
+        },
+      ]);
 
       // Set as current workspace if it's the first one
       if (workspaces.length === 0) {
-        setCurrentWorkspace(newWorkspace);
+        setCurrentWorkspace({
+          ...newWorkspace,
+          subscription_tier:
+            newWorkspace.subscription_tier as SubscriptionTier | null,
+          settings: (newWorkspace.settings ?? null) as Record<
+            string,
+            unknown
+          > | null,
+        });
       }
 
       toast({
@@ -156,10 +197,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     updates: Partial<Workspace>
   ) => {
     try {
+      // Ensure settings is serializable to JSON or null
+      const updatesForSupabase = {
+        ...updates,
+        settings:
+          updates.settings === undefined
+            ? undefined
+            : updates.settings === null
+            ? null
+            : JSON.parse(JSON.stringify(updates.settings)),
+      };
+
       const { data, error } = await supabase
         .schema("beekon_data")
         .from("workspaces")
-        .update(updates)
+        .update(updatesForSupabase)
         .eq("id", workspaceId)
         .select()
         .single();
@@ -168,11 +220,31 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
       const updatedWorkspace = data;
       setWorkspaces((prev) =>
-        prev.map((w) => (w.id === workspaceId ? updatedWorkspace : w))
+        prev.map((w) =>
+          w.id === workspaceId
+            ? {
+                ...updatedWorkspace,
+                subscription_tier:
+                  updatedWorkspace.subscription_tier as SubscriptionTier | null,
+                settings: (updatedWorkspace.settings ?? null) as Record<
+                  string,
+                  unknown
+                > | null,
+              }
+            : w
+        )
       );
 
       if (currentWorkspace?.id === workspaceId) {
-        setCurrentWorkspace(updatedWorkspace);
+        setCurrentWorkspace({
+          ...updatedWorkspace,
+          subscription_tier:
+            updatedWorkspace.subscription_tier as SubscriptionTier | null,
+          settings: (updatedWorkspace.settings ?? null) as Record<
+            string,
+            unknown
+          > | null,
+        });
       }
 
       toast({
@@ -207,7 +279,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         // If the deleted workspace was the current one, select a new one
         if (currentWorkspace?.id === workspaceId) {
           setCurrentWorkspace(
-            remainingWorkspaces.length > 0 ? remainingWorkspaces[0] : null
+            remainingWorkspaces.length > 0
+              ? (remainingWorkspaces[0] as Workspace)
+              : null
           );
         }
 
@@ -245,20 +319,91 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     await fetchWorkspaces();
   };
 
+  const fetchWebsites = useCallback(async () => {
+    if (!user?.id || !currentWorkspace?.id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .schema("beekon_data")
+        .from("websites")
+        .select("*")
+        .eq("workspace_id", currentWorkspace?.id)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setWebsites(
+        (data || []).map((w) => ({
+          ...w,
+          workspace_id: w.workspace_id ?? "",
+          display_name: w.display_name ?? "",
+          crawl_status: w.crawl_status ?? null,
+          last_crawled_at: w.last_crawled_at ?? "",
+          is_active: w.is_active ?? false,
+          created_at: w.created_at ?? "",
+          updated_at: w.updated_at ?? "",
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching websites", error);
+      setWebsites([]);
+      toast({
+        title: "Error",
+        description: "Failed to fetch websites. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, currentWorkspace?.id, toast]);
+
+  const deleteWebsite = async (websiteId: string) => {
+    if (!user?.id || !currentWorkspace?.id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .schema("beekon_data")
+        .from("websites")
+        .delete()
+        .eq("id", websiteId)
+        .eq("workspace_id", currentWorkspace?.id);
+
+      if (error) throw error;
+      setWebsites((prev) => prev.filter((w) => w.id !== websiteId));
+    } catch (error) {
+      console.log("error", error);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchWorkspaces();
+      fetchWebsites();
     } else {
       setCurrentWorkspace(null);
       setWorkspaces([]);
+      setWebsites([]);
       setLoading(false);
     }
-  }, [user?.id, fetchWorkspaces]);
+  }, [user?.id, fetchWorkspaces, fetchWebsites]);
+
+  const refetchWebsites = async () => {
+    setLoading(true);
+    await fetchWebsites();
+  };
 
   const value = {
     currentWorkspace,
     workspaces,
     loading,
+    websites,
+    deleteWebsite,
+    refetchWebsites,
     createWorkspace,
     updateWorkspace,
     deleteWorkspace,

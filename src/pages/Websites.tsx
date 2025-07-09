@@ -27,11 +27,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
+import { useWorkspace, Website } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
-import type { Website } from "@/types/website";
 import {
   BarChart3,
   Calendar,
@@ -42,7 +41,7 @@ import {
   Settings,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function Websites() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -50,19 +49,13 @@ export default function Websites() {
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [domain, setDomain] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState<number | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [websiteToDelete, setWebsiteToDelete] = useState<number | null>(null);
+  const [websiteToDelete, setWebsiteToDelete] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
+  const { websites, deleteWebsite } = useWorkspace();
   const { workspaceId } = useAuth();
-
-  // Mock data with state for dynamic updates
-  const [websites, setWebsites] = useState<Website[] | []>([]);
-
-  useEffect(() => {
-    supabase.from("website").select();
-  }, []);
 
   // Add `https://` if it doesn't exists
   const addProtocol = (domain: string) => {
@@ -112,7 +105,7 @@ export default function Websites() {
     if (!response.success) {
       toast({
         title: "Error",
-        description: "Website crawl failed. Ensure the site is accessible.",
+        description: "Website crawl failed. Website not found.",
         variant: "destructive",
       });
       return;
@@ -155,50 +148,44 @@ export default function Websites() {
     setSelectedWebsite(null);
   };
 
-  const handleAnalyzeNow = async (websiteId: number) => {
-    console.log("websiteId", websiteId);
+  const handleAnalyzeNow = async (websiteId: string, domain: string) => {
     setIsAnalyzing(websiteId);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      toast({
-        title: "Analysis started",
-        description:
-          "Your website analysis has been queued and will begin shortly.",
-      });
-    } catch (error) {
+    if (!websiteId) {
       toast({
         title: "Error",
-        description: "Failed to start analysis. Please try again.",
+        description: "Website not found.",
         variant: "destructive",
       });
-    } finally {
+    }
+
+    const response = await sendN8nWebhook("webhook/re-analyze", {
+      id: websiteId,
+      website: domain,
+    });
+
+    if (!response.success) {
+      toast({
+        title: "Error",
+        description: "There was an error during re-analysis.",
+        variant: "destructive",
+      });
+
       setIsAnalyzing(null);
+      return;
     }
+
+    toast({
+      title: "Website added!",
+      description: `We're in the process of analyzing ${domain}`,
+    });
+    setIsAnalyzing(null);
   };
 
-  const handleDeleteWebsite = async (websiteId: number) => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      setWebsites((prev) => prev.filter((site) => site?.id !== websiteId));
-
-      toast({
-        title: "Website deleted",
-        description: "The website has been removed from monitoring.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete website. Please try again.",
-        variant: "destructive",
-      });
-    }
+  const handleDeleteWebsite = async (websiteId: string) => {
+    deleteWebsite(websiteId);
   };
 
-  const confirmDelete = (websiteId: number) => {
+  const confirmDelete = (websiteId: string) => {
     setWebsiteToDelete(websiteId);
     setShowDeleteConfirm(true);
   };
@@ -298,13 +285,13 @@ export default function Websites() {
                   </div>
                   <div>
                     <CardTitle className="text-lg">
-                      {website.displayName || website.domain}
+                      {website.display_name || website.domain}
                     </CardTitle>
                     <CardDescription>{website.domain}</CardDescription>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {getStatusBadge(website.status)}
+                  {getStatusBadge(website.crawl_status!)}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm">
@@ -313,7 +300,9 @@ export default function Websites() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => handleAnalyzeNow(website.id)}
+                        onClick={() =>
+                          handleAnalyzeNow(website.id, website.domain)
+                        }
                         disabled={isAnalyzing === website.id}
                       >
                         <BarChart3 className="h-4 w-4 mr-2" />
@@ -346,7 +335,9 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Last Analyzed</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(website.lastAnalyzed).toLocaleDateString()}
+                      {website.last_crawled_at
+                        ? new Date(website.created_at).toLocaleDateString()
+                        : new Date(website.created_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -355,7 +346,7 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Total Topics</p>
                     <p className="text-sm text-muted-foreground">
-                      {website.totalTopics}
+                      {/* {website.totalTopics} // TODO: create feature to get topics in workspace context*/}
                     </p>
                   </div>
                 </div>
@@ -364,7 +355,7 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Avg Visibility</p>
                     <p className="text-sm text-muted-foreground">
-                      {website.avgVisibility}%
+                      {/* {website.avgVisibility}% TODO: create feature to get avg visibility in workspace context */}
                     </p>
                   </div>
                 </div>
@@ -376,7 +367,8 @@ export default function Websites() {
 
       {/* Website Settings Modal */}
       <WebsiteSettingsModal
-        website={selectedWebsite}
+        // website={selectedWebsite // TODO: need to work on selected websites}
+        website={null}
         isOpen={isSettingsModalOpen}
         onClose={handleCloseSettings}
       />
@@ -387,9 +379,12 @@ export default function Websites() {
           setShowDeleteConfirm(false);
           setWebsiteToDelete(null);
         }}
-        onConfirm={() =>
-          websiteToDelete && handleDeleteWebsite(websiteToDelete)
-        }
+        onConfirm={() => {
+          if (websiteToDelete !== null) {
+            return handleDeleteWebsite(websiteToDelete);
+          }
+          return;
+        }}
         title="Delete Website"
         description="Are you sure you want to delete this website? This will remove all associated analysis data and cannot be undone."
         confirmText="Delete Website"
