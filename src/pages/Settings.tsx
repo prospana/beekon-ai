@@ -120,8 +120,8 @@ export default function Settings() {
             Update your profile information
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
               <Input 
@@ -178,8 +178,8 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base">Email Notifications</Label>
+            <div className="space-y-2">
+              <Label>Email Notifications</Label>
               <p className="text-sm text-muted-foreground">
                 Receive email updates about your analysis results
               </p>
@@ -193,8 +193,8 @@ export default function Settings() {
           <Separator />
           
           <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base">Weekly Reports</Label>
+            <div className="space-y-2">
+              <Label>Weekly Reports</Label>
               <p className="text-sm text-muted-foreground">
                 Get weekly summaries of your AI visibility performance
               </p>
@@ -208,8 +208,8 @@ export default function Settings() {
           <Separator />
           
           <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base">Competitor Alerts</Label>
+            <div className="space-y-2">
+              <Label>Competitor Alerts</Label>
               <p className="text-sm text-muted-foreground">
                 Get notified when competitors gain or lose visibility
               </p>
@@ -223,8 +223,8 @@ export default function Settings() {
           <Separator />
           
           <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base">Analysis Complete</Label>
+            <div className="space-y-2">
+              <Label>Analysis Complete</Label>
               <p className="text-sm text-muted-foreground">
                 Get notified when website analysis is complete
               </p>
@@ -248,7 +248,7 @@ export default function Settings() {
             Manage your account security settings
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="currentPassword">Current Password</Label>
             <Input 
@@ -298,10 +298,10 @@ export default function Settings() {
             Manage your API keys and access tokens
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="apiKey">API Key</Label>
-            <div className="flex space-x-2">
+            <div className="flex gap-3">
               <Input id="apiKey" value="bk_..." disabled className="font-mono" />
               <Button 
                 variant="outline"

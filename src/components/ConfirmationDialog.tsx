@@ -84,7 +84,7 @@ export function ConfirmationDialog({
             {description}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex space-x-2">
+        <DialogFooter>
           <Button
             variant="outline"
             onClick={onClose}

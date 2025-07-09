@@ -54,7 +54,7 @@ export default function Websites() {
   const [websiteToDelete, setWebsiteToDelete] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
-  const { websites, deleteWebsite } = useWorkspace();
+  const { websites, deleteWebsite, refetchWebsites } = useWorkspace();
   const { workspaceId } = useAuth();
 
   // Add `https://` if it doesn't exists
@@ -71,6 +71,7 @@ export default function Websites() {
         description: "Please enter a domain name",
         variant: "destructive",
       });
+      setProcessing(false);
       return;
     }
 
@@ -80,12 +81,13 @@ export default function Websites() {
         description: "Please enter a display name",
         variant: "destructive",
       });
+      setProcessing(false);
       return;
     }
 
     // Validate domain format
     const domainRegex =
-      /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+      /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(\/.*)?$/i;
 
     if (!domainRegex.test(domain)) {
       toast({
@@ -93,6 +95,7 @@ export default function Websites() {
         description: "Please enter a valid domain name",
         variant: "destructive",
       });
+      setProcessing(false);
       return;
     }
 
@@ -108,6 +111,7 @@ export default function Websites() {
         description: "Website crawl failed. Website not found.",
         variant: "destructive",
       });
+      setProcessing(false);
       return;
     }
 
@@ -117,6 +121,7 @@ export default function Websites() {
       description: `Analysis started for ${domain}`,
     });
 
+    refetchWebsites();
     setDomain("");
     setDisplayName("");
     setProcessing(false);
@@ -214,7 +219,7 @@ export default function Websites() {
                 Add a website to start monitoring its AI visibility
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="domain">Domain</Label>
                 <Input
@@ -284,7 +289,7 @@ export default function Websites() {
                     <Globe className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">
+                    <CardTitle>
                       {website.display_name || website.domain}
                     </CardTitle>
                     <CardDescription>{website.domain}</CardDescription>

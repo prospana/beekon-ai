@@ -172,7 +172,7 @@ export default function Dashboard() {
             <p className="text-muted-foreground">Loading workspace...</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardHeader>
@@ -260,13 +260,13 @@ export default function Dashboard() {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => handleMetricClick("Overall Visibility Score")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle>
               Overall Visibility Score
             </CardTitle>
             <div className="flex items-center space-x-1">
@@ -288,7 +288,7 @@ export default function Dashboard() {
           onClick={() => handleMetricClick("Average Rank")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Rank</CardTitle>
+            <CardTitle>Average Rank</CardTitle>
             <div className="flex items-center space-x-1">
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
               <ExternalLink className="h-3 w-3 text-muted-foreground" />
@@ -308,7 +308,7 @@ export default function Dashboard() {
           onClick={() => handleMetricClick("Total Mentions")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle>
               Total Mentions
             </CardTitle>
             <div className="flex items-center space-x-1">
@@ -330,7 +330,7 @@ export default function Dashboard() {
           onClick={() => handleMetricClick("Sentiment Score")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle>
               Sentiment Score
             </CardTitle>
             <div className="flex items-center space-x-1">
@@ -358,7 +358,7 @@ export default function Dashboard() {
                 Your brand's visibility trend across all LLMs (last 7 days)
               </CardDescription>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 size="sm"
@@ -405,7 +405,7 @@ export default function Dashboard() {
                 How your brand performs across different topics and keywords
               </CardDescription>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 size="sm"

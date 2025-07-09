@@ -139,7 +139,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             </Avatar>
             <div className="space-y-2">
               <Label htmlFor="avatar">Profile Picture</Label>
-              <div className="flex space-x-2">
+              <div className="flex gap-3">
                 <LoadingButton
                   type="button"
                   variant="outline"
@@ -239,7 +239,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             />
           </div>
 
-          <DialogFooter className="flex space-x-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"

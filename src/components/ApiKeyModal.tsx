@@ -221,7 +221,7 @@ export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
                   Create a new API key for accessing Beekon.ai services
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="keyName">API Key Name</Label>
                   <Input
@@ -271,7 +271,7 @@ export function ApiKeyModal({ isOpen, onClose }: ApiKeyModalProps) {
                           <div className="font-medium">{apiKey.name}</div>
                           {getStatusBadge(apiKey.status)}
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center gap-3">
                           <Button
                             variant="ghost"
                             size="sm"

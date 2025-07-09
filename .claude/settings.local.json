@@ -10,7 +10,8 @@
       "Bash(npm cache clean:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run type-check:*)",
-      "Bash(npm run validate:*)"
+      "Bash(npm run validate:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

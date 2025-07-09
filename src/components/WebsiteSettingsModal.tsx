@@ -456,7 +456,7 @@ export function WebsiteSettingsModal({
             </div>
           </Tabs>
 
-          <DialogFooter className="flex space-x-2">
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel} className="focus-ring">
               Cancel
             </Button>

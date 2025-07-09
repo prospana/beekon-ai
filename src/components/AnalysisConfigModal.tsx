@@ -328,7 +328,7 @@ export function AnalysisConfigModal({
                 ))}
               </div>
               
-              <div className="flex space-x-2">
+              <div className="flex gap-3">
                 <Input
                   placeholder="Add custom topic..."
                   value={customTopic}
@@ -469,7 +469,7 @@ export function AnalysisConfigModal({
             </div>
           </div>
 
-          <DialogFooter className="flex space-x-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"

@@ -1,4 +1,12 @@
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -6,38 +14,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { analysisService } from "@/services/analysisService";
 import {
-  ExternalLink,
-  Download,
-  ThumbsUp,
-  ThumbsDown,
-  Minus,
-  TrendingUp,
-  TrendingDown,
-  Copy,
-  Share,
   BarChart3,
-  FileText,
-  Table,
-  Code,
   ChevronDown,
+  Code,
+  Copy,
+  Download,
+  FileText,
+  Minus,
+  Share,
+  Table,
+  ThumbsDown,
+  ThumbsUp,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
+import { useState } from "react";
 
 interface AnalysisResult {
   id: string;
   prompt: string;
-  chatgpt: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
-  claude: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
-  gemini: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
+  chatgpt: {
+    mentioned: boolean;
+    rank: number | null;
+    sentiment: string | null;
+    response?: string;
+  };
+  claude: {
+    mentioned: boolean;
+    rank: number | null;
+    sentiment: string | null;
+    response?: string;
+  };
+  gemini: {
+    mentioned: boolean;
+    rank: number | null;
+    sentiment: string | null;
+    response?: string;
+  };
   topic: string;
   timestamp: string;
   confidence: number;
@@ -63,21 +88,24 @@ export function DetailedAnalysisModal({
 
   const handleExport = async (format: "pdf" | "csv" | "json") => {
     if (!analysisResult) return;
-    
+
     setIsExporting(true);
     try {
-      const blob = await analysisService.exportAnalysisResults([analysisResult.id], format);
-      
+      const blob = await analysisService.exportAnalysisResults(
+        [analysisResult.id],
+        format
+      );
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `analysis-${analysisResult.id}-${Date.now()}.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: "Export successful",
         description: `Analysis data exported as ${format.toUpperCase()}`,
@@ -94,12 +122,15 @@ export function DetailedAnalysisModal({
     }
   };
 
-  const handleSaveFeedback = async (llm: string, feedback: "positive" | "negative") => {
+  const handleSaveFeedback = async (
+    llm: string,
+    feedback: "positive" | "negative"
+  ) => {
     setIsSaving(true);
     try {
       // Simulate saving feedback
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       toast({
         title: "Feedback saved",
         description: `Your feedback for ${llm} has been recorded.`,
@@ -152,9 +183,12 @@ export function DetailedAnalysisModal({
   ];
 
   const mockResponses = {
-    chatgpt: "Based on my analysis, this company offers innovative AI-powered solutions for business automation. Their platform integrates well with existing workflows and provides comprehensive analytics. I'd recommend them for medium to large enterprises looking for scalable automation tools.",
-    claude: "This organization provides sophisticated artificial intelligence tools designed for business process optimization. Their approach combines machine learning with user-friendly interfaces. The solution appears well-suited for companies seeking to enhance operational efficiency through intelligent automation.",
-    gemini: "The company specializes in AI-driven business solutions with a focus on automation and analytics. Their technology stack includes advanced machine learning capabilities and robust integration options. They seem to target enterprise clients looking for comprehensive AI implementation.",
+    chatgpt:
+      "Based on my analysis, this company offers innovative AI-powered solutions for business automation. Their platform integrates well with existing workflows and provides comprehensive analytics. I'd recommend them for medium to large enterprises looking for scalable automation tools.",
+    claude:
+      "This organization provides sophisticated artificial intelligence tools designed for business process optimization. Their approach combines machine learning with user-friendly interfaces. The solution appears well-suited for companies seeking to enhance operational efficiency through intelligent automation.",
+    gemini:
+      "The company specializes in AI-driven business solutions with a focus on automation and analytics. Their technology stack includes advanced machine learning capabilities and robust integration options. They seem to target enterprise clients looking for comprehensive AI implementation.",
   };
 
   return (
@@ -166,7 +200,7 @@ export function DetailedAnalysisModal({
               <BarChart3 className="h-5 w-5" />
               <span>Detailed Analysis Results</span>
             </div>
-            <div className="flex items-center space-x-2">
+            {/* <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -179,10 +213,11 @@ export function DetailedAnalysisModal({
                 <Share className="h-4 w-4 mr-2" />
                 Share
               </Button>
-            </div>
+            </div> */}
           </DialogTitle>
           <DialogDescription className="text-base">
-            Analysis for: <span className="font-medium">"{analysisResult.prompt}"</span>
+            Analysis for:{" "}
+            <span className="font-medium">"{analysisResult.prompt}"</span>
           </DialogDescription>
           <div className="flex items-center space-x-3">
             <Badge variant="outline">{analysisResult.topic}</Badge>
@@ -210,14 +245,18 @@ export function DetailedAnalysisModal({
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-3 h-3 rounded-full ${llm.color}`} />
+                          <div
+                            className={`w-3 h-3 rounded-full ${llm.color}`}
+                          />
                           <CardTitle className="text-lg">{llm.name}</CardTitle>
                         </div>
                         <div className="flex items-center space-x-2">
                           {llm.data.mentioned ? (
                             <>
                               <Badge className="bg-success">Mentioned</Badge>
-                              <Badge variant="outline">Rank #{llm.data.rank}</Badge>
+                              <Badge variant="outline">
+                                Rank #{llm.data.rank}
+                              </Badge>
                             </>
                           ) : (
                             <Badge variant="outline">Not Mentioned</Badge>
@@ -230,10 +269,16 @@ export function DetailedAnalysisModal({
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium">Sentiment:</span>
+                              <span className="text-sm font-medium">
+                                Sentiment:
+                              </span>
                               <div className="flex items-center space-x-1">
                                 {getSentimentIcon(llm.data.sentiment)}
-                                <span className={`text-sm capitalize ${getSentimentColor(llm.data.sentiment)}`}>
+                                <span
+                                  className={`text-sm capitalize ${getSentimentColor(
+                                    llm.data.sentiment
+                                  )}`}
+                                >
                                   {llm.data.sentiment || "Neutral"}
                                 </span>
                               </div>
@@ -242,7 +287,9 @@ export function DetailedAnalysisModal({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleSaveFeedback(llm.name, "positive")}
+                                onClick={() =>
+                                  handleSaveFeedback(llm.name, "positive")
+                                }
                                 disabled={isSaving}
                               >
                                 <ThumbsUp className="h-4 w-4" />
@@ -250,7 +297,9 @@ export function DetailedAnalysisModal({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleSaveFeedback(llm.name, "negative")}
+                                onClick={() =>
+                                  handleSaveFeedback(llm.name, "negative")
+                                }
                                 disabled={isSaving}
                               >
                                 <ThumbsDown className="h-4 w-4" />
@@ -263,7 +312,8 @@ export function DetailedAnalysisModal({
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">
-                          Your brand was not mentioned in the response to this prompt.
+                          Your brand was not mentioned in the response to this
+                          prompt.
                         </div>
                       )}
                     </CardContent>
@@ -285,16 +335,26 @@ export function DetailedAnalysisModal({
                     <div className="space-y-3">
                       <div className="p-4 bg-muted/50 rounded-lg">
                         <p className="text-sm leading-relaxed">
-                          {mockResponses[llm.name.toLowerCase() as keyof typeof mockResponses]}
+                          {
+                            mockResponses[
+                              llm.name.toLowerCase() as keyof typeof mockResponses
+                            ]
+                          }
                         </p>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                           {llm.data.mentioned && (
                             <>
-                              <span>Mentioned at position #{llm.data.rank}</span>
+                              <span>
+                                Mentioned at position #{llm.data.rank}
+                              </span>
                               <span>•</span>
-                              <span className={getSentimentColor(llm.data.sentiment)}>
+                              <span
+                                className={getSentimentColor(
+                                  llm.data.sentiment
+                                )}
+                              >
                                 {llm.data.sentiment || "Neutral"} sentiment
                               </span>
                             </>
@@ -303,7 +363,13 @@ export function DetailedAnalysisModal({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => copyToClipboard(mockResponses[llm.name.toLowerCase() as keyof typeof mockResponses])}
+                          onClick={() =>
+                            copyToClipboard(
+                              mockResponses[
+                                llm.name.toLowerCase() as keyof typeof mockResponses
+                              ]
+                            )
+                          }
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -336,7 +402,7 @@ export function DetailedAnalysisModal({
                         <li>• Consistent brand recognition</li>
                       </ul>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <h4 className="font-medium flex items-center space-x-2">
                         <TrendingDown className="h-4 w-4 text-warning" />
@@ -356,10 +422,21 @@ export function DetailedAnalysisModal({
                   <div className="space-y-2">
                     <h4 className="font-medium">Recommendations</h4>
                     <div className="text-sm text-muted-foreground space-y-2">
-                      <p>• Focus on improving content and SEO for topics related to "{analysisResult.topic}"</p>
-                      <p>• Create more comprehensive documentation and case studies</p>
-                      <p>• Engage with AI training data sources and industry publications</p>
-                      <p>• Monitor competitor mentions and positioning strategies</p>
+                      <p>
+                        • Focus on improving content and SEO for topics related
+                        to "{analysisResult.topic}"
+                      </p>
+                      <p>
+                        • Create more comprehensive documentation and case
+                        studies
+                      </p>
+                      <p>
+                        • Engage with AI training data sources and industry
+                        publications
+                      </p>
+                      <p>
+                        • Monitor competitor mentions and positioning strategies
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -369,7 +446,7 @@ export function DetailedAnalysisModal({
         </Tabs>
 
         <div className="flex items-center justify-between pt-4 border-t">
-          <div className="flex space-x-2">
+          <div className="flex gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <LoadingButton
@@ -398,7 +475,7 @@ export function DetailedAnalysisModal({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -407,7 +484,7 @@ export function DetailedAnalysisModal({
               <Copy className="h-4 w-4 mr-2" />
               Copy Prompt
             </Button>
-            
+
             <Button variant="outline" size="sm">
               <Share className="h-4 w-4 mr-2" />
               Share
