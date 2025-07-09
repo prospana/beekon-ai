@@ -277,15 +277,6 @@ export default function Websites() {
                 variant: "default",
                 icon: Plus,
               },
-              // {
-              //   label: "View Example",
-              //   onClick: () => toast({
-              //     title: "Example Feature",
-              //     description: "Example website analysis would be shown here",
-              //   }),
-              //   variant: "outline",
-              //   icon: Target,
-              // },
             ]}
           />
 
