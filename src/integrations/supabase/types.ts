@@ -12,265 +12,83 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)";
   };
-  beekon_data: {
+  public: {
     Tables: {
-      competitors: {
+      api_keys: {
         Row: {
-          competitor_domain: string;
-          competitor_name: string | null;
           created_at: string | null;
           id: string;
           is_active: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at: string | null;
+          name: string;
+          usage_count: number | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at?: string | null;
+          name: string;
+          usage_count?: number | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          key_hash?: string;
+          key_prefix?: string;
+          last_used_at?: string | null;
+          name?: string;
+          usage_count?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      profiles: {
+        Row: {
+          company: string | null;
+          created_at: string | null;
+          email: string | null;
+          first_name: string | null;
+          full_name: string | null;
+          id: string;
+          last_name: string | null;
+          notification_settings: Json | null;
           updated_at: string | null;
-          website_id: string | null;
-        };
-        Insert: {
-          competitor_domain: string;
-          competitor_name?: string | null;
-          created_at?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          updated_at?: string | null;
-          website_id?: string | null;
-        };
-        Update: {
-          competitor_domain?: string;
-          competitor_name?: string | null;
-          created_at?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          updated_at?: string | null;
-          website_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "competitors_website_id_fkey";
-            columns: ["website_id"];
-            isOneToOne: false;
-            referencedRelation: "websites";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      llm_analysis_results: {
-        Row: {
-          analyzed_at: string | null;
-          confidence_score: number | null;
-          created_at: string | null;
-          id: string;
-          is_mentioned: boolean | null;
-          llm_provider: string;
-          prompt_id: string | null;
-          rank_position: number | null;
-          response_text: string | null;
-          sentiment_score: number | null;
-          summary_text: string | null;
-          website_id: string | null;
-        };
-        Insert: {
-          analyzed_at?: string | null;
-          confidence_score?: number | null;
-          created_at?: string | null;
-          id?: string;
-          is_mentioned?: boolean | null;
-          llm_provider: string;
-          prompt_id?: string | null;
-          rank_position?: number | null;
-          response_text?: string | null;
-          sentiment_score?: number | null;
-          summary_text?: string | null;
-          website_id?: string | null;
-        };
-        Update: {
-          analyzed_at?: string | null;
-          confidence_score?: number | null;
-          created_at?: string | null;
-          id?: string;
-          is_mentioned?: boolean | null;
-          llm_provider?: string;
-          prompt_id?: string | null;
-          rank_position?: number | null;
-          response_text?: string | null;
-          sentiment_score?: number | null;
-          summary_text?: string | null;
-          website_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "llm_analysis_results_prompt_id_fkey";
-            columns: ["prompt_id"];
-            isOneToOne: false;
-            referencedRelation: "prompts";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "llm_analysis_results_website_id_fkey";
-            columns: ["website_id"];
-            isOneToOne: false;
-            referencedRelation: "websites";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      prompts: {
-        Row: {
-          created_at: string | null;
-          id: string;
-          is_active: boolean | null;
-          priority: number | null;
-          prompt_text: string;
-          prompt_type: string | null;
-          topic_id: string | null;
-        };
-        Insert: {
-          created_at?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          priority?: number | null;
-          prompt_text: string;
-          prompt_type?: string | null;
-          topic_id?: string | null;
-        };
-        Update: {
-          created_at?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          priority?: number | null;
-          prompt_text?: string;
-          prompt_type?: string | null;
-          topic_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "prompts_topic_id_fkey";
-            columns: ["topic_id"];
-            isOneToOne: false;
-            referencedRelation: "topics";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      topics: {
-        Row: {
-          created_at: string | null;
-          id: string;
-          is_active: boolean | null;
-          is_validated: boolean | null;
-          recommendation_text: string | null;
-          reporting_text: string | null;
-          topic_keywords: string[] | null;
-          topic_name: string;
-          website_id: string | null;
-        };
-        Insert: {
-          created_at?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          is_validated?: boolean | null;
-          recommendation_text?: string | null;
-          reporting_text?: string | null;
-          topic_keywords?: string[] | null;
-          topic_name: string;
-          website_id?: string | null;
-        };
-        Update: {
-          created_at?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          is_validated?: boolean | null;
-          recommendation_text?: string | null;
-          reporting_text?: string | null;
-          topic_keywords?: string[] | null;
-          topic_name?: string;
-          website_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "topics_website_id_fkey";
-            columns: ["website_id"];
-            isOneToOne: false;
-            referencedRelation: "websites";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      websites: {
-        Row: {
-          crawl_status: string | null;
-          created_at: string | null;
-          display_name: string | null;
-          domain: string;
-          id: string;
-          is_active: boolean | null;
-          last_crawled_at: string | null;
-          updated_at: string | null;
+          user_id: string;
           workspace_id: string | null;
         };
         Insert: {
-          crawl_status?: string | null;
+          company?: string | null;
           created_at?: string | null;
-          display_name?: string | null;
-          domain: string;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
           id?: string;
-          is_active?: boolean | null;
-          last_crawled_at?: string | null;
+          last_name?: string | null;
+          notification_settings?: Json | null;
           updated_at?: string | null;
+          user_id: string;
           workspace_id?: string | null;
         };
         Update: {
-          crawl_status?: string | null;
+          company?: string | null;
           created_at?: string | null;
-          display_name?: string | null;
-          domain?: string;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
           id?: string;
-          is_active?: boolean | null;
-          last_crawled_at?: string | null;
+          last_name?: string | null;
+          notification_settings?: Json | null;
           updated_at?: string | null;
+          user_id?: string;
           workspace_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "websites_workspace_id_fkey";
-            columns: ["workspace_id"];
-            isOneToOne: false;
-            referencedRelation: "workspaces";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      workspaces: {
-        Row: {
-          created_at: string | null;
-          credits_remaining: number | null;
-          credits_reset_at: string | null;
-          id: string;
-          name: string;
-          owner_id: string | null;
-          settings: Json | null;
-          subscription_tier: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          created_at?: string | null;
-          credits_remaining?: number | null;
-          credits_reset_at?: string | null;
-          id?: string;
-          name: string;
-          owner_id?: string | null;
-          settings?: Json | null;
-          subscription_tier?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          created_at?: string | null;
-          credits_remaining?: number | null;
-          credits_reset_at?: string | null;
-          id?: string;
-          name?: string;
-          owner_id?: string | null;
-          settings?: Json | null;
-          subscription_tier?: string | null;
-          updated_at?: string | null;
         };
         Relationships: [];
       };
@@ -411,7 +229,7 @@ export type CompositeTypes<
   : never;
 
 export const Constants = {
-  beekon_data: {
+  public: {
     Enums: {},
   },
 } as const;
