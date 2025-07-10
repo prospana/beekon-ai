@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -17,6 +17,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { websiteSettingsService } from "@/services/websiteSettingsService";
 import {
   Globe,
   Settings,
@@ -77,13 +79,15 @@ export function WebsiteSettingsModal({
 }: WebsiteSettingsModalProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("general");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<WebsiteSettingsFormData>({
     resolver: zodResolver(websiteSettingsSchema),
     defaultValues: {
-      displayName: website?.displayName || "",
+      displayName: website?.display_name || website?.domain || "",
       domain: website?.domain || "",
-      status: website?.status || "active",
+      status: website?.is_active ? "active" : "paused",
       description: "",
       analysisFrequency: "weekly",
       autoAnalysis: true,
@@ -99,15 +103,83 @@ export function WebsiteSettingsModal({
     },
   });
 
-  const onSubmit = (data: WebsiteSettingsFormData) => {
-    // TODO: Implement API call to save settings
+  // Load website settings when modal opens
+  useEffect(() => {
+    const loadWebsiteSettings = async () => {
+      if (!website?.id || !isOpen) return;
+      
+      setIsLoading(true);
+      try {
+        const settings = await websiteSettingsService.getWebsiteSettings(website.id);
+        if (settings) {
+          form.reset({
+            displayName: website.display_name || website.domain || "",
+            domain: website.domain || "",
+            status: website.is_active ? "active" : "paused",
+            description: "",
+            analysisFrequency: settings.analysis_frequency,
+            autoAnalysis: settings.auto_analysis,
+            notifications: settings.notifications,
+            competitorTracking: settings.competitor_tracking,
+            weeklyReports: settings.weekly_reports,
+            showInDashboard: settings.show_in_dashboard,
+            priorityLevel: settings.priority_level,
+            customLabels: settings.custom_labels || "",
+            apiAccess: settings.api_access,
+            dataRetention: settings.data_retention,
+            exportEnabled: settings.export_enabled,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load website settings:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load website settings.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadWebsiteSettings();
+  }, [website?.id, website?.display_name, website?.domain, website?.is_active, isOpen, form, toast]);
+
+  const onSubmit = async (data: WebsiteSettingsFormData) => {
+    if (!website?.id) return;
     
-    toast({
-      title: "Settings saved",
-      description: `Settings for ${data.displayName} have been updated successfully.`,
-    });
-    
-    onClose();
+    setIsSaving(true);
+    try {
+      await websiteSettingsService.updateWebsiteSettings(website.id, {
+        analysis_frequency: data.analysisFrequency,
+        auto_analysis: data.autoAnalysis,
+        notifications: data.notifications,
+        competitor_tracking: data.competitorTracking,
+        weekly_reports: data.weeklyReports,
+        show_in_dashboard: data.showInDashboard,
+        priority_level: data.priorityLevel,
+        custom_labels: data.customLabels,
+        api_access: data.apiAccess,
+        data_retention: data.dataRetention,
+        export_enabled: data.exportEnabled,
+      });
+      
+      toast({
+        title: "Settings saved",
+        description: `Settings for ${data.displayName} have been updated successfully.`,
+      });
+      
+      onClose();
+    } catch (error) {
+      console.error('Failed to save website settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save website settings. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -126,7 +198,7 @@ export function WebsiteSettingsModal({
               <Globe className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <div className="text-xl font-semibold">{website.displayName}</div>
+              <div className="text-xl font-semibold">{website.display_name || website.domain}</div>
               <div className="text-sm text-muted-foreground font-normal">
                 {website.domain}
               </div>
@@ -138,27 +210,33 @@ export function WebsiteSettingsModal({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="general" className="flex items-center space-x-2">
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">General</span>
-              </TabsTrigger>
-              <TabsTrigger value="analysis" className="flex items-center space-x-2">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Analysis</span>
-              </TabsTrigger>
-              <TabsTrigger value="display" className="flex items-center space-x-2">
-                <Zap className="h-4 w-4" />
-                <span className="hidden sm:inline">Display</span>
-              </TabsTrigger>
-              <TabsTrigger value="advanced" className="flex items-center space-x-2">
-                <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline">Advanced</span>
-              </TabsTrigger>
-            </TabsList>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="general" className="flex items-center space-x-2">
+                    <Settings className="h-4 w-4" />
+                    <span className="hidden sm:inline">General</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="analysis" className="flex items-center space-x-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Analysis</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="display" className="flex items-center space-x-2">
+                    <Zap className="h-4 w-4" />
+                    <span className="hidden sm:inline">Display</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="advanced" className="flex items-center space-x-2">
+                    <Shield className="h-4 w-4" />
+                    <span className="hidden sm:inline">Advanced</span>
+                  </TabsTrigger>
+                </TabsList>
 
-            <div className="mt-6 max-h-[60vh] overflow-y-auto">
+                <div className="mt-6 max-h-[60vh] overflow-y-auto">
               <TabsContent value="general" className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -453,17 +531,30 @@ export function WebsiteSettingsModal({
                   </CardContent>
                 </Card>
               </TabsContent>
-            </div>
-          </Tabs>
+                </div>
+              </Tabs>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCancel} className="focus-ring">
+              <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleCancel} 
+              className="focus-ring"
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button type="submit" className="focus-ring">
+            <LoadingButton 
+              type="submit" 
+              className="focus-ring"
+              loading={isSaving}
+              loadingText="Saving..."
+            >
               Save Settings
-            </Button>
-          </DialogFooter>
+            </LoadingButton>
+              </DialogFooter>
+            </>
+          )}
         </form>
       </DialogContent>
     </Dialog>

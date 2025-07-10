@@ -4,8 +4,8 @@ export function useAnalysisErrorHandler() {
   const [error, setError] = useState<Error | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
 
-  const handleError = useCallback((error: Error | unknown) => {
-    const errorObj = error instanceof Error ? error : new Error(String(error));
+  const handleError = useCallback((error: Error | string | unknown) => {
+    const errorObj = error instanceof Error ? error : new Error(typeof error === 'string' ? error : String(error));
     setError(errorObj);
   }, []);
 

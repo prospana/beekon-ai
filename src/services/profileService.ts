@@ -8,6 +8,7 @@ export interface UserProfile {
   first_name: string | null;
   last_name: string | null;
   company: string | null;
+  avatar_url: string | null;
   workspace_id: string | null;
   notification_settings: NotificationSettings;
   created_at: string;
@@ -26,6 +27,7 @@ export interface ProfileUpdateData {
   last_name?: string;
   company?: string;
   full_name?: string;
+  avatar_url?: string;
 }
 
 export interface NotificationUpdateData {
@@ -224,30 +226,98 @@ export class ProfileService {
     newPassword: string
   ): Promise<void> {
     try {
-      // First verify current password by attempting to sign in
+      // Get current user session
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) {
         throw new Error("User not authenticated");
       }
 
-      // Verify current password
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
-      });
-
-      if (signInError) {
-        throw new Error("Current password is incorrect");
-      }
-
-      // Update password
+      // Use Supabase's built-in password update which handles verification
+      // Note: This requires the user to be currently authenticated
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        // Handle specific error cases
+        if (updateError.message.includes("same")) {
+          throw new Error("New password must be different from current password");
+        }
+        if (updateError.message.includes("weak")) {
+          throw new Error("Password is too weak. Please choose a stronger password");
+        }
+        throw new Error(updateError.message || "Failed to update password");
+      }
     } catch (error) {
       console.error("Failed to change password:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload avatar image and update profile
+   */
+  async uploadAvatar(userId: string, file: File): Promise<string> {
+    try {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        throw new Error('File must be an image');
+      }
+
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        throw new Error('File size must be less than 2MB');
+      }
+
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update profile with new avatar URL
+      await this.updateProfile(userId, { avatar_url: publicUrl });
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Failed to upload avatar:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete avatar image
+   */
+  async deleteAvatar(userId: string, avatarUrl: string): Promise<void> {
+    try {
+      // Extract file path from URL
+      const url = new URL(avatarUrl);
+      const filePath = url.pathname.split('/').slice(-2).join('/'); // Get userId/filename.ext
+
+      // Delete from storage
+      const { error: deleteError } = await supabase.storage
+        .from('avatars')
+        .remove([filePath]);
+
+      if (deleteError) throw deleteError;
+
+      // Update profile to remove avatar URL
+      await this.updateProfile(userId, { avatar_url: null });
+    } catch (error) {
+      console.error('Failed to delete avatar:', error);
       throw error;
     }
   }

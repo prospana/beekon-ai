@@ -15,6 +15,23 @@ export type SubscriptionTier =
   | "professional"
   | "enterprise";
 
+export interface WorkspaceSettings {
+  theme?: "light" | "dark" | "system";
+  timezone?: string;
+  language?: string;
+  default_analysis_frequency?: "daily" | "weekly" | "bi-weekly" | "monthly";
+  notifications?: {
+    email?: boolean;
+    push?: boolean;
+    weekly_reports?: boolean;
+  };
+  integrations?: {
+    slack?: { webhook_url?: string; enabled?: boolean };
+    discord?: { webhook_url?: string; enabled?: boolean };
+  };
+  [key: string]: unknown; // Allow additional settings
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -22,7 +39,7 @@ export interface Workspace {
   subscription_tier: SubscriptionTier | null;
   credits_remaining: number | null;
   credits_reset_at: string | null;
-  settings: Record<string, unknown> | null;
+  settings: WorkspaceSettings | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -93,9 +110,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       const workspaceData = (data || []).map((w) => ({
         ...w,
         subscription_tier: w.subscription_tier as SubscriptionTier | null,
-        settings: (w.settings ?? null) as Record<string, unknown> | null,
+        settings: (w.settings ?? null) as WorkspaceSettings | null,
       }));
-      setWorkspaces(workspaceData);
+      
+      setWorkspaces(prev => {
+        // Only update if the data actually changed to prevent unnecessary re-renders
+        if (JSON.stringify(prev) !== JSON.stringify(workspaceData)) {
+          return workspaceData;
+        }
+        return prev;
+      });
 
       // Set current workspace to the first one if none is selected and workspaces exist
       if (workspaceData.length > 0 && !currentWorkspace) {
@@ -157,10 +181,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           ...newWorkspace,
           subscription_tier:
             newWorkspace.subscription_tier as SubscriptionTier | null,
-          settings: (newWorkspace.settings ?? null) as Record<
-            string,
-            unknown
-          > | null,
+          settings: (newWorkspace.settings ?? null) as WorkspaceSettings | null,
         },
       ]);
 
@@ -170,10 +191,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           ...newWorkspace,
           subscription_tier:
             newWorkspace.subscription_tier as SubscriptionTier | null,
-          settings: (newWorkspace.settings ?? null) as Record<
-            string,
-            unknown
-          > | null,
+          settings: (newWorkspace.settings ?? null) as WorkspaceSettings | null,
         });
       }
 
@@ -226,10 +244,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
                 ...updatedWorkspace,
                 subscription_tier:
                   updatedWorkspace.subscription_tier as SubscriptionTier | null,
-                settings: (updatedWorkspace.settings ?? null) as Record<
-                  string,
-                  unknown
-                > | null,
+                settings: (updatedWorkspace.settings ?? null) as WorkspaceSettings | null,
               }
             : w
         )
@@ -240,10 +255,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           ...updatedWorkspace,
           subscription_tier:
             updatedWorkspace.subscription_tier as SubscriptionTier | null,
-          settings: (updatedWorkspace.settings ?? null) as Record<
-            string,
-            unknown
-          > | null,
+          settings: (updatedWorkspace.settings ?? null) as WorkspaceSettings | null,
         });
       }
 
@@ -330,22 +342,29 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         .schema("beekon_data")
         .from("websites")
         .select("*")
-        .eq("workspace_id", currentWorkspace?.id)
+        .eq("workspace_id", currentWorkspace.id)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-      setWebsites(
-        (data || []).map((w) => ({
-          ...w,
-          workspace_id: w.workspace_id ?? "",
-          display_name: w.display_name ?? "",
-          crawl_status: w.crawl_status ?? null,
-          last_crawled_at: w.last_crawled_at ?? "",
-          is_active: w.is_active ?? false,
-          created_at: w.created_at ?? "",
-          updated_at: w.updated_at ?? "",
-        }))
-      );
+      
+      const websiteData = (data || []).map((w) => ({
+        ...w,
+        workspace_id: w.workspace_id ?? "",
+        display_name: w.display_name ?? "",
+        crawl_status: w.crawl_status ?? null,
+        last_crawled_at: w.last_crawled_at ?? "",
+        is_active: w.is_active ?? false,
+        created_at: w.created_at ?? "",
+        updated_at: w.updated_at ?? "",
+      }));
+      
+      setWebsites(prev => {
+        // Only update if the data actually changed to prevent unnecessary re-renders
+        if (JSON.stringify(prev) !== JSON.stringify(websiteData)) {
+          return websiteData;
+        }
+        return prev;
+      });
     } catch (error) {
       console.error("Error fetching websites", error);
       setWebsites([]);
@@ -383,14 +402,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user?.id) {
       fetchWorkspaces();
-      fetchWebsites();
     } else {
       setCurrentWorkspace(null);
       setWorkspaces([]);
       setWebsites([]);
       setLoading(false);
     }
-  }, [user?.id, fetchWorkspaces, fetchWebsites]);
+  }, [user?.id, fetchWorkspaces]);
+
+  // Separate effect for fetching websites when workspace changes
+  useEffect(() => {
+    if (user?.id && currentWorkspace?.id) {
+      fetchWebsites();
+    } else {
+      setWebsites([]);
+    }
+  }, [user?.id, currentWorkspace?.id, fetchWebsites]);
 
   const refetchWebsites = async () => {
     setLoading(true);
