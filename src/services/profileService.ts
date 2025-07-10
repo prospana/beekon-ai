@@ -1,9 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 
-type ProfileRow = Database['public']['Tables']['profiles']['Row'];
-type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+type ProfileRow = Database['beekon_data']['Tables']['profiles']['Row'];
+type ProfileInsert = Database['beekon_data']['Tables']['profiles']['Insert'];
+type ProfileUpdate = Database['beekon_data']['Tables']['profiles']['Update'];
 
 export interface UserProfile extends ProfileRow {
   notification_settings: NotificationSettings;

@@ -12,7 +12,7 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)";
   };
-  public: {
+  beekon_data: {
     Tables: {
       api_keys: {
         Row: {
@@ -50,67 +50,6 @@ export type Database = {
         };
         Relationships: [];
       };
-      profiles: {
-        Row: {
-          avatar_url: string | null;
-          company: string | null;
-          created_at: string | null;
-          email: string | null;
-          first_name: string | null;
-          full_name: string | null;
-          id: string;
-          last_name: string | null;
-          notification_settings: Json | null;
-          updated_at: string | null;
-          user_id: string;
-          workspace_id: string | null;
-        };
-        Insert: {
-          avatar_url?: string | null;
-          company?: string | null;
-          created_at?: string | null;
-          email?: string | null;
-          first_name?: string | null;
-          full_name?: string | null;
-          id?: string;
-          last_name?: string | null;
-          notification_settings?: Json | null;
-          updated_at?: string | null;
-          user_id: string;
-          workspace_id?: string | null;
-        };
-        Update: {
-          avatar_url?: string | null;
-          company?: string | null;
-          created_at?: string | null;
-          email?: string | null;
-          first_name?: string | null;
-          full_name?: string | null;
-          id?: string;
-          last_name?: string | null;
-          notification_settings?: Json | null;
-          updated_at?: string | null;
-          user_id?: string;
-          workspace_id?: string | null;
-        };
-        Relationships: [];
-      };
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      [_ in never]: never;
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
-  beekon_data: {
-    Tables: {
       competitors: {
         Row: {
           competitor_domain: string;
@@ -205,6 +144,59 @@ export type Database = {
             columns: ["website_id"];
             isOneToOne: false;
             referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      profiles: {
+        Row: {
+          avatar_url: string | null;
+          company: string | null;
+          created_at: string | null;
+          email: string | null;
+          first_name: string | null;
+          full_name: string | null;
+          id: string;
+          last_name: string | null;
+          notification_settings: Json | null;
+          updated_at: string | null;
+          user_id: string;
+          workspace_id: string | null;
+        };
+        Insert: {
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id: string;
+          workspace_id?: string | null;
+        };
+        Update: {
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id?: string;
+          workspace_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profiles_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
             referencedColumns: ["id"];
           }
         ];
@@ -413,7 +405,15 @@ export type Database = {
           subscription_tier?: string | null;
           updated_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["user_id"];
+          }
+        ];
       };
     };
     Views: {
@@ -552,9 +552,6 @@ export type CompositeTypes<
   : never;
 
 export const Constants = {
-  public: {
-    Enums: {},
-  },
   beekon_data: {
     Enums: {},
   },

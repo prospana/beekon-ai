@@ -1,9 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 
-type ApiKeyRow = Database['public']['Tables']['api_keys']['Row'];
-type ApiKeyInsert = Database['public']['Tables']['api_keys']['Insert'];
-type ApiKeyUpdate = Database['public']['Tables']['api_keys']['Update'];
+type ApiKeyRow = Database['beekon_data']['Tables']['api_keys']['Row'];
+type ApiKeyInsert = Database['beekon_data']['Tables']['api_keys']['Insert'];
+type ApiKeyUpdate = Database['beekon_data']['Tables']['api_keys']['Update'];
 
 // Browser-compatible crypto functions
 const generateRandomBytes = (length: number): Uint8Array => {
