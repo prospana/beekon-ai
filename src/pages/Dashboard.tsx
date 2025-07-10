@@ -41,7 +41,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CartesianGrid,
@@ -61,6 +61,12 @@ export default function Dashboard() {
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [dateFilter, setDateFilter] = useState<"7d" | "30d" | "90d">("7d");
   const [showAllCharts, setShowAllCharts] = useState(false);
+  const filters = useMemo(
+    () => ({
+      period: dateFilter,
+    }),
+    [dateFilter]
+  );
 
   // Use dashboard data hooks
   const {
@@ -75,7 +81,7 @@ export default function Dashboard() {
     error: dashboardError,
     hasData,
     clearError,
-  } = useDashboardMetrics({ period: dateFilter });
+  } = useDashboardMetrics(filters);
 
   const websiteIds = websites?.map((w) => w.id) || [];
 

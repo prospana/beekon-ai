@@ -53,11 +53,7 @@ export function useDashboardMetrics(
     [websites]
   );
 
-  // Memoize filters to prevent infinite loops
-  const memoizedFilters = useMemo(
-    () => filters,
-    [filters]
-  );
+  const { dateRange, period } = filters;
 
   const loadDashboardData = useCallback(
     async (isRefresh = false) => {
@@ -79,14 +75,8 @@ export function useDashboardMetrics(
           llmPerformance,
           websitePerformance,
         ] = await Promise.all([
-          dashboardService.getDashboardMetrics(
-            websiteIds,
-            memoizedFilters.dateRange
-          ),
-          dashboardService.getTimeSeriesData(
-            websiteIds,
-            memoizedFilters.period
-          ),
+          dashboardService.getDashboardMetrics(websiteIds, dateRange),
+          dashboardService.getTimeSeriesData(websiteIds, period),
           dashboardService.getTopicPerformance(websiteIds, 10),
           dashboardService.getLLMPerformance(websiteIds),
           dashboardService.getWebsitePerformance(websiteIds),
@@ -135,7 +125,7 @@ export function useDashboardMetrics(
         });
       }
     },
-    [websiteIds, memoizedFilters, workspaceLoading, toast]
+    [websiteIds, dateRange, period, workspaceLoading, toast]
   );
 
   const refreshData = useCallback(() => {
