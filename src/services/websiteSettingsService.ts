@@ -1,4 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
+
+type WebsiteSettingsRow = Database['beekon_data']['Tables']['website_settings']['Row'];
+type WebsiteSettingsInsert = Database['beekon_data']['Tables']['website_settings']['Insert'];
+type WebsiteSettingsUpdate = Database['beekon_data']['Tables']['website_settings']['Update'];
 import { WebsiteSettings } from "@/types/website";
 
 export interface WebsiteSettingsUpdateData {

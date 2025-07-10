@@ -1,4 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
+
+type ApiKeyRow = Database['public']['Tables']['api_keys']['Row'];
+type ApiKeyInsert = Database['public']['Tables']['api_keys']['Insert'];
+type ApiKeyUpdate = Database['public']['Tables']['api_keys']['Update'];
 
 // Browser-compatible crypto functions
 const generateRandomBytes = (length: number): Uint8Array => {
@@ -18,17 +23,7 @@ const sha256 = async (data: string): Promise<string> => {
   return arrayBufferToHex(hashBuffer);
 };
 
-export interface ApiKey {
-  id: string;
-  user_id: string;
-  name: string;
-  key_hash: string;
-  key_prefix: string;
-  created_at: string;
-  last_used_at: string | null;
-  is_active: boolean;
-  usage_count: number;
-}
+export type ApiKey = ApiKeyRow;
 
 export interface ApiKeyWithSecret extends Omit<ApiKey, "key_hash"> {
   key: string; // Only available immediately after creation

@@ -12,6 +12,103 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)";
   };
+  public: {
+    Tables: {
+      api_keys: {
+        Row: {
+          created_at: string | null;
+          id: string;
+          is_active: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at: string | null;
+          name: string;
+          usage_count: number | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at?: string | null;
+          name: string;
+          usage_count?: number | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          key_hash?: string;
+          key_prefix?: string;
+          last_used_at?: string | null;
+          name?: string;
+          usage_count?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      profiles: {
+        Row: {
+          avatar_url: string | null;
+          company: string | null;
+          created_at: string | null;
+          email: string | null;
+          first_name: string | null;
+          full_name: string | null;
+          id: string;
+          last_name: string | null;
+          notification_settings: Json | null;
+          updated_at: string | null;
+          user_id: string;
+          workspace_id: string | null;
+        };
+        Insert: {
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id: string;
+          workspace_id?: string | null;
+        };
+        Update: {
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id?: string;
+          workspace_id?: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   beekon_data: {
     Tables: {
       competitors: {
@@ -455,6 +552,9 @@ export type CompositeTypes<
   : never;
 
 export const Constants = {
+  public: {
+    Enums: {},
+  },
   beekon_data: {
     Enums: {},
   },

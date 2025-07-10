@@ -1,18 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
 
-export interface UserProfile {
-  id: string;
-  user_id: string;
-  email: string | null;
-  full_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  company: string | null;
-  avatar_url: string | null;
-  workspace_id: string | null;
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+
+export interface UserProfile extends ProfileRow {
   notification_settings: NotificationSettings;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface NotificationSettings {

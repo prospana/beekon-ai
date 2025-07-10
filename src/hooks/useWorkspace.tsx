@@ -122,22 +122,24 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Set current workspace to the first one if none is selected and workspaces exist
-      if (workspaceData.length > 0 && !currentWorkspace) {
-        setCurrentWorkspace(workspaceData[0] ?? null);
-      } else if (workspaceData.length === 0) {
-        // Ensure currentWorkspace is null when no workspaces exist
-        setCurrentWorkspace(null);
-      }
+      setCurrentWorkspace(prevWorkspace => {
+        if (workspaceData.length > 0 && !prevWorkspace) {
+          return workspaceData[0] ?? null;
+        } else if (workspaceData.length === 0) {
+          // Ensure currentWorkspace is null when no workspaces exist
+          return null;
+        }
 
-      // Validate that current workspace still exists
-      if (
-        currentWorkspace &&
-        !workspaceData.find((w) => w.id === currentWorkspace.id)
-      ) {
-        setCurrentWorkspace(
-          workspaceData.length > 0 ? workspaceData[0] ?? null : null
-        );
-      }
+        // Validate that current workspace still exists
+        if (
+          prevWorkspace &&
+          !workspaceData.find((w) => w.id === prevWorkspace.id)
+        ) {
+          return workspaceData.length > 0 ? workspaceData[0] ?? null : null;
+        }
+        
+        return prevWorkspace;
+      });
     } catch (error) {
       console.error("Error fetching workspaces:", error);
       setWorkspaces([]);
@@ -150,7 +152,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, currentWorkspace, toast]);
+  }, [user?.id, toast]);
 
   const createWorkspace = async (
     name: string,
