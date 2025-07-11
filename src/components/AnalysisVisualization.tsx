@@ -3,15 +3,27 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart3, TrendingUp, TrendingDown, Target, Zap } from "lucide-react";
 
+interface LLMResult {
+  id: string;
+  llm_provider: string;
+  is_mentioned: boolean;
+  rank_position: number | null;
+  sentiment_score: number | null;
+  response_text: string | null;
+  confidence_score: number | null;
+  analyzed_at: string;
+}
+
 interface AnalysisResult {
   id: string;
   prompt: string;
-  chatgpt: { mentioned: boolean; rank: number | null; sentiment: string | null };
-  claude: { mentioned: boolean; rank: number | null; sentiment: string | null };
-  gemini: { mentioned: boolean; rank: number | null; sentiment: string | null };
+  website_id: string;
   topic: string;
-  timestamp: string;
+  status: string;
   confidence: number;
+  created_at: string;
+  updated_at: string;
+  llm_results: LLMResult[];
 }
 
 interface AnalysisVisualizationProps {
@@ -24,38 +36,59 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
   }
 
   const totalResults = results.length;
+  
+  // Get all LLM results from all analysis results
+  const allLLMResults = results.flatMap(r => r.llm_results);
+  
   const mentionedResults = results.filter(r => 
-    r.chatgpt.mentioned || r.claude.mentioned || r.gemini.mentioned
+    r.llm_results.some(llm => llm.is_mentioned)
   ).length;
   const mentionRate = (mentionedResults / totalResults) * 100;
 
-  // Calculate LLM performance
-  const llmStats = {
-    chatgpt: {
-      mentions: results.filter(r => r.chatgpt.mentioned).length,
-      avgRank: results
-        .filter(r => r.chatgpt.mentioned && r.chatgpt.rank)
-        .reduce((acc, r) => acc + (r.chatgpt.rank || 0), 0) / 
-        results.filter(r => r.chatgpt.mentioned && r.chatgpt.rank).length || 0,
-      positiveSentiment: results.filter(r => r.chatgpt.sentiment === "positive").length,
-    },
-    claude: {
-      mentions: results.filter(r => r.claude.mentioned).length,
-      avgRank: results
-        .filter(r => r.claude.mentioned && r.claude.rank)
-        .reduce((acc, r) => acc + (r.claude.rank || 0), 0) / 
-        results.filter(r => r.claude.mentioned && r.claude.rank).length || 0,
-      positiveSentiment: results.filter(r => r.claude.sentiment === "positive").length,
-    },
-    gemini: {
-      mentions: results.filter(r => r.gemini.mentioned).length,
-      avgRank: results
-        .filter(r => r.gemini.mentioned && r.gemini.rank)
-        .reduce((acc, r) => acc + (r.gemini.rank || 0), 0) / 
-        results.filter(r => r.gemini.mentioned && r.gemini.rank).length || 0,
-      positiveSentiment: results.filter(r => r.gemini.sentiment === "positive").length,
-    },
-  };
+  // Calculate LLM performance using modern format
+  const llmStats = allLLMResults.reduce((stats, llmResult) => {
+    const provider = llmResult.llm_provider;
+    if (!stats[provider]) {
+      stats[provider] = {
+        mentions: 0,
+        totalRank: 0,
+        rankedMentions: 0,
+        positiveSentiment: 0,
+      };
+    }
+    
+    if (llmResult.is_mentioned) {
+      stats[provider].mentions++;
+      if (llmResult.rank_position) {
+        stats[provider].totalRank += llmResult.rank_position;
+        stats[provider].rankedMentions++;
+      }
+      if (llmResult.sentiment_score && llmResult.sentiment_score > 0.1) {
+        stats[provider].positiveSentiment++;
+      }
+    }
+    
+    return stats;
+  }, {} as Record<string, {
+    mentions: number;
+    totalRank: number;
+    rankedMentions: number;
+    positiveSentiment: number;
+  }>);
+
+  // Calculate average ranks
+  const processedLLMStats = Object.entries(llmStats).reduce((processed, [provider, stats]) => {
+    processed[provider] = {
+      mentions: stats.mentions,
+      avgRank: stats.rankedMentions > 0 ? stats.totalRank / stats.rankedMentions : 0,
+      positiveSentiment: stats.positiveSentiment,
+    };
+    return processed;
+  }, {} as Record<string, {
+    mentions: number;
+    avgRank: number;
+    positiveSentiment: number;
+  }>);
 
   const avgConfidence = results.reduce((acc, r) => acc + r.confidence, 0) / results.length;
 
@@ -116,7 +149,7 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
           <CardDescription>Performance across AI models</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {Object.entries(llmStats).map(([llm, stats]) => (
+          {Object.entries(processedLLMStats).map(([llm, stats]) => (
             <div key={llm} className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium capitalize">{llm}</span>
@@ -182,9 +215,15 @@ export function SentimentChart({ results }: { results: AnalysisResult[] }) {
   };
 
   results.forEach(result => {
-    [result.chatgpt, result.claude, result.gemini].forEach(llm => {
-      if (llm.mentioned && llm.sentiment) {
-        sentimentCounts[llm.sentiment as keyof typeof sentimentCounts]++;
+    result.llm_results.forEach(llm => {
+      if (llm.is_mentioned && llm.sentiment_score !== null) {
+        if (llm.sentiment_score > 0.1) {
+          sentimentCounts.positive++;
+        } else if (llm.sentiment_score < -0.1) {
+          sentimentCounts.negative++;
+        } else {
+          sentimentCounts.neutral++;
+        }
       }
     });
   });
@@ -240,10 +279,10 @@ export function RankingChart({ results }: { results: AnalysisResult[] }) {
   };
 
   results.forEach(result => {
-    [result.chatgpt, result.claude, result.gemini].forEach(llm => {
-      if (llm.mentioned && llm.rank) {
-        if (llm.rank <= 5) {
-          rankingData[llm.rank as keyof typeof rankingData]++;
+    result.llm_results.forEach(llm => {
+      if (llm.is_mentioned && llm.rank_position) {
+        if (llm.rank_position <= 5) {
+          rankingData[llm.rank_position as keyof typeof rankingData]++;
         } else {
           rankingData["5+"]++;
         }

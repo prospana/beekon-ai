@@ -55,7 +55,9 @@ export default function Websites() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [websiteToDelete, setWebsiteToDelete] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [websiteMetrics, setWebsiteMetrics] = useState<Record<string, { totalTopics: number; avgVisibility: number }>>({});
+  const [websiteMetrics, _] = useState<
+    Record<string, { totalTopics: number; avgVisibility: number }>
+  >({});
   const { toast } = useToast();
   const { websites, deleteWebsite, refetchWebsites } = useWorkspace();
   const { workspaceId } = useAuth();
@@ -70,10 +72,12 @@ export default function Websites() {
   const getWebsiteMetrics = (websiteId: string) => {
     // This is a placeholder implementation
     // In a real application, this would fetch from the database
-    return websiteMetrics[websiteId] || {
-      totalTopics: Math.floor(Math.random() * 25) + 5, // Random between 5-30
-      avgVisibility: Math.floor(Math.random() * 40) + 60, // Random between 60-100%
-    };
+    return (
+      websiteMetrics[websiteId] || {
+        totalTopics: Math.floor(Math.random() * 25) + 5, // Random between 5-30
+        avgVisibility: Math.floor(Math.random() * 40) + 60, // Random between 60-100%
+      }
+    );
   };
 
   const handleAddWebsite = async () => {

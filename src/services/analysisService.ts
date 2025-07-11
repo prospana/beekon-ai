@@ -219,6 +219,7 @@ export class AnalysisService {
       llmProvider?: string;
       status?: AnalysisStatus;
       dateRange?: { start: string; end: string };
+      searchQuery?: string;
     }
   ): Promise<AnalysisResult[]> {
     let query = supabase
@@ -253,6 +254,13 @@ export class AnalysisService {
         .lte("created_at", filters.dateRange.end);
     }
 
+    if (filters?.searchQuery && filters.searchQuery.trim()) {
+      const searchTerm = filters.searchQuery.trim();
+      query = query.or(
+        `prompts.prompt_text.ilike.%${searchTerm}%,prompts.topics.topic_name.ilike.%${searchTerm}%,response_text.ilike.%${searchTerm}%`
+      );
+    }
+
     const { data, error } = await query;
     if (error) throw error;
 
@@ -261,6 +269,10 @@ export class AnalysisService {
 
     data?.forEach((row) => {
       const promptId = row.prompt_id;
+      if (!promptId) {
+        // Skip rows with null prompt_id
+        return;
+      }
       const prompt = row.prompts as {
         prompt_text: string;
         topics: { topic_name: string };
@@ -273,7 +285,7 @@ export class AnalysisService {
           website_id: websiteId,
           topic: prompt.topics.topic_name,
           status: "completed" as AnalysisStatus,
-          confidence: row.confidence_score || 0,
+          confidence: 100 || 0,
           created_at: row.created_at || "",
           updated_at: row.created_at || "",
           llm_results: [],
@@ -298,11 +310,22 @@ export class AnalysisService {
 
   async getTopicsForWebsite(
     websiteId: string
-  ): Promise<Array<{ id: string; name: string }>> {
+  ): Promise<Array<{ id: string; name: string; resultCount: number }>> {
     const { data, error } = await supabase
       .schema("beekon_data")
       .from("topics")
-      .select("id, topic_name")
+      .select(
+        `
+        id, 
+        topic_name,
+        prompts!inner (
+          id,
+          llm_analysis_results (
+            id
+          )
+        )
+      `
+      )
       .eq("website_id", websiteId)
       .eq("is_active", true)
       .order("topic_name");
@@ -310,11 +333,61 @@ export class AnalysisService {
     if (error) throw error;
 
     return (
-      data?.map((topic) => ({
-        id: topic.id,
-        name: topic.topic_name,
-      })) || []
+      data?.map((topic) => {
+        const resultCount =
+          topic.prompts?.reduce((total, prompt) => {
+            return total + (prompt.llm_analysis_results?.length || 0);
+          }, 0) || 0;
+
+        return {
+          id: topic.id,
+          name: topic.topic_name,
+          resultCount,
+        };
+      }) || []
     );
+  }
+
+  async getAvailableLLMProviders(
+    websiteId: string
+  ): Promise<Array<{ id: string; name: string; resultCount: number }>> {
+    const { data, error } = await supabase
+      .schema("beekon_data")
+      .from("llm_analysis_results")
+      .select(
+        `
+        llm_provider,
+        prompts!inner (
+          topics!inner (
+            website_id
+          )
+        )
+      `
+      )
+      .eq("prompts.topics.website_id", websiteId);
+
+    if (error) throw error;
+
+    // Count results by LLM provider
+    const providerCounts = new Map<string, number>();
+    data?.forEach((result) => {
+      const provider = result.llm_provider;
+      providerCounts.set(provider, (providerCounts.get(provider) || 0) + 1);
+    });
+
+    // Map to display format with proper names
+    const providerNames = {
+      chatgpt: "ChatGPT",
+      claude: "Claude",
+      gemini: "Gemini",
+      perplexity: "Perplexity",
+    };
+
+    return Array.from(providerCounts.entries()).map(([id, count]) => ({
+      id,
+      name: providerNames[id as keyof typeof providerNames] || id,
+      resultCount: count,
+    }));
   }
 
   subscribeToProgress(

@@ -112,8 +112,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         subscription_tier: w.subscription_tier as SubscriptionTier | null,
         settings: (w.settings ?? null) as WorkspaceSettings | null,
       }));
-      
-      setWorkspaces(prev => {
+
+      setWorkspaces((prev) => {
         // Only update if the data actually changed to prevent unnecessary re-renders
         if (JSON.stringify(prev) !== JSON.stringify(workspaceData)) {
           return workspaceData;
@@ -122,7 +122,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Set current workspace to the first one if none is selected and workspaces exist
-      setCurrentWorkspace(prevWorkspace => {
+      setCurrentWorkspace((prevWorkspace) => {
         if (workspaceData.length > 0 && !prevWorkspace) {
           return workspaceData[0] ?? null;
         } else if (workspaceData.length === 0) {
@@ -137,7 +137,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         ) {
           return workspaceData.length > 0 ? workspaceData[0] ?? null : null;
         }
-        
+
         return prevWorkspace;
       });
     } catch (error) {
@@ -246,7 +246,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
                 ...updatedWorkspace,
                 subscription_tier:
                   updatedWorkspace.subscription_tier as SubscriptionTier | null,
-                settings: (updatedWorkspace.settings ?? null) as WorkspaceSettings | null,
+                settings: (updatedWorkspace.settings ??
+                  null) as WorkspaceSettings | null,
               }
             : w
         )
@@ -257,7 +258,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           ...updatedWorkspace,
           subscription_tier:
             updatedWorkspace.subscription_tier as SubscriptionTier | null,
-          settings: (updatedWorkspace.settings ?? null) as WorkspaceSettings | null,
+          settings: (updatedWorkspace.settings ??
+            null) as WorkspaceSettings | null,
         });
       }
 
@@ -348,7 +350,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-      
+
       const websiteData = (data || []).map((w) => ({
         ...w,
         workspace_id: w.workspace_id ?? "",
@@ -359,8 +361,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         created_at: w.created_at ?? "",
         updated_at: w.updated_at ?? "",
       }));
-      
-      setWebsites(prev => {
+
+      setWebsites((prev) => {
         // Only update if the data actually changed to prevent unnecessary re-renders
         if (JSON.stringify(prev) !== JSON.stringify(websiteData)) {
           return websiteData;
