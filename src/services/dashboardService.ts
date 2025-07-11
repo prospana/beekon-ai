@@ -197,7 +197,7 @@ export class DashboardService {
           visibility: metrics.overallVisibilityScore,
           mentions: metrics.totalMentions,
           sentiment: metrics.sentimentScore,
-          lastAnalyzed: results.length > 0 ? results[0]!.created_at : "",
+          lastAnalyzed: results.length > 0 ? results[0]!.analyzed_at : "",
         });
       }
 

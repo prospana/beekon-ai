@@ -41,32 +41,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
-
-interface AnalysisResult {
-  id: string;
-  prompt: string;
-  chatgpt: {
-    mentioned: boolean;
-    rank: number | null;
-    sentiment: string | null;
-    response?: string;
-  };
-  claude: {
-    mentioned: boolean;
-    rank: number | null;
-    sentiment: string | null;
-    response?: string;
-  };
-  gemini: {
-    mentioned: boolean;
-    rank: number | null;
-    sentiment: string | null;
-    response?: string;
-  };
-  topic: string;
-  timestamp: string;
-  confidence: number;
-}
+import { AnalysisResult, LLMResult } from "@/types/database";
 
 interface DetailedAnalysisModalProps {
   isOpen: boolean;
@@ -176,20 +151,47 @@ export function DetailedAnalysisModal({
     }
   };
 
-  const llmResults = [
-    { name: "ChatGPT", data: analysisResult.chatgpt, color: "bg-green-500" },
-    { name: "Claude", data: analysisResult.claude, color: "bg-orange-500" },
-    { name: "Gemini", data: analysisResult.gemini, color: "bg-blue-500" },
-  ];
-
-  const mockResponses = {
-    chatgpt:
-      "Based on my analysis, this company offers innovative AI-powered solutions for business automation. Their platform integrates well with existing workflows and provides comprehensive analytics. I'd recommend them for medium to large enterprises looking for scalable automation tools.",
-    claude:
-      "This organization provides sophisticated artificial intelligence tools designed for business process optimization. Their approach combines machine learning with user-friendly interfaces. The solution appears well-suited for companies seeking to enhance operational efficiency through intelligent automation.",
-    gemini:
-      "The company specializes in AI-driven business solutions with a focus on automation and analytics. Their technology stack includes advanced machine learning capabilities and robust integration options. They seem to target enterprise clients looking for comprehensive AI implementation.",
+  // Helper function to get sentiment string from score
+  const getSentimentFromScore = (score: number | null): string => {
+    if (score === null) return "neutral";
+    if (score > 0.1) return "positive";
+    if (score < -0.1) return "negative";
+    return "neutral";
   };
+
+  // Convert modern format to UI format for easier display
+  const llmResults = [
+    {
+      name: "ChatGPT",
+      data: {
+        mentioned: analysisResult.llm_results.find(r => r.llm_provider === "chatgpt")?.is_mentioned || false,
+        rank: analysisResult.llm_results.find(r => r.llm_provider === "chatgpt")?.rank_position || null,
+        sentiment: getSentimentFromScore(analysisResult.llm_results.find(r => r.llm_provider === "chatgpt")?.sentiment_score || null),
+        response: analysisResult.llm_results.find(r => r.llm_provider === "chatgpt")?.response_text || null,
+      },
+      color: "bg-green-500"
+    },
+    {
+      name: "Claude",
+      data: {
+        mentioned: analysisResult.llm_results.find(r => r.llm_provider === "claude")?.is_mentioned || false,
+        rank: analysisResult.llm_results.find(r => r.llm_provider === "claude")?.rank_position || null,
+        sentiment: getSentimentFromScore(analysisResult.llm_results.find(r => r.llm_provider === "claude")?.sentiment_score || null),
+        response: analysisResult.llm_results.find(r => r.llm_provider === "claude")?.response_text || null,
+      },
+      color: "bg-orange-500"
+    },
+    {
+      name: "Gemini",
+      data: {
+        mentioned: analysisResult.llm_results.find(r => r.llm_provider === "gemini")?.is_mentioned || false,
+        rank: analysisResult.llm_results.find(r => r.llm_provider === "gemini")?.rank_position || null,
+        sentiment: getSentimentFromScore(analysisResult.llm_results.find(r => r.llm_provider === "gemini")?.sentiment_score || null),
+        response: analysisResult.llm_results.find(r => r.llm_provider === "gemini")?.response_text || null,
+      },
+      color: "bg-blue-500"
+    },
+  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -225,7 +227,7 @@ export function DetailedAnalysisModal({
               Confidence: {analysisResult.confidence}%
             </Badge>
             <span className="text-sm text-muted-foreground">
-              {new Date(analysisResult.timestamp).toLocaleString()}
+              {new Date(analysisResult.created_at).toLocaleString()}
             </span>
           </div>
         </DialogHeader>
@@ -335,11 +337,7 @@ export function DetailedAnalysisModal({
                     <div className="space-y-3">
                       <div className="p-4 bg-muted/50 rounded-lg">
                         <p className="text-sm leading-relaxed">
-                          {
-                            mockResponses[
-                              llm.name.toLowerCase() as keyof typeof mockResponses
-                            ]
-                          }
+                          {llm.data.response || "No response available for this analysis."}
                         </p>
                       </div>
                       <div className="flex items-center justify-between">
@@ -365,9 +363,7 @@ export function DetailedAnalysisModal({
                           size="sm"
                           onClick={() =>
                             copyToClipboard(
-                              mockResponses[
-                                llm.name.toLowerCase() as keyof typeof mockResponses
-                              ]
+                              llm.data.response || "No response available for this analysis."
                             )
                           }
                         >

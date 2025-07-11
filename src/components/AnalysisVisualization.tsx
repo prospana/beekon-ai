@@ -1,30 +1,14 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { BarChart3, TrendingUp, TrendingDown, Target, Zap } from "lucide-react";
-
-interface LLMResult {
-  id: string;
-  llm_provider: string;
-  is_mentioned: boolean;
-  rank_position: number | null;
-  sentiment_score: number | null;
-  response_text: string | null;
-  confidence_score: number | null;
-  analyzed_at: string;
-}
-
-interface AnalysisResult {
-  id: string;
-  prompt: string;
-  website_id: string;
-  topic: string;
-  status: string;
-  confidence: number;
-  created_at: string;
-  updated_at: string;
-  llm_results: LLMResult[];
-}
+import { AnalysisResult } from "@/types/database";
+import { BarChart3, Target, TrendingDown, TrendingUp, Zap } from "lucide-react";
 
 interface AnalysisVisualizationProps {
   results: AnalysisResult[];
@@ -36,61 +20,75 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
   }
 
   const totalResults = results.length;
-  
+
   // Get all LLM results from all analysis results
-  const allLLMResults = results.flatMap(r => r.llm_results);
-  
-  const mentionedResults = results.filter(r => 
-    r.llm_results.some(llm => llm.is_mentioned)
+  const allLLMResults = results.flatMap((r) => r.llm_results);
+
+  const mentionedResults = results.filter((r) =>
+    r.llm_results.some((llm) => llm.is_mentioned)
   ).length;
   const mentionRate = (mentionedResults / totalResults) * 100;
 
   // Calculate LLM performance using modern format
-  const llmStats = allLLMResults.reduce((stats, llmResult) => {
-    const provider = llmResult.llm_provider;
-    if (!stats[provider]) {
-      stats[provider] = {
-        mentions: 0,
-        totalRank: 0,
-        rankedMentions: 0,
-        positiveSentiment: 0,
-      };
-    }
-    
-    if (llmResult.is_mentioned) {
-      stats[provider].mentions++;
-      if (llmResult.rank_position) {
-        stats[provider].totalRank += llmResult.rank_position;
-        stats[provider].rankedMentions++;
+  const llmStats = allLLMResults.reduce(
+    (stats, llmResult) => {
+      const provider = llmResult.llm_provider;
+      if (!stats[provider]) {
+        stats[provider] = {
+          mentions: 0,
+          totalRank: 0,
+          rankedMentions: 0,
+          positiveSentiment: 0,
+        };
       }
-      if (llmResult.sentiment_score && llmResult.sentiment_score > 0.1) {
-        stats[provider].positiveSentiment++;
+
+      if (llmResult.is_mentioned) {
+        stats[provider].mentions++;
+        if (llmResult.rank_position) {
+          stats[provider].totalRank += llmResult.rank_position;
+          stats[provider].rankedMentions++;
+        }
+        if (llmResult.sentiment_score && llmResult.sentiment_score > 0.1) {
+          stats[provider].positiveSentiment++;
+        }
       }
-    }
-    
-    return stats;
-  }, {} as Record<string, {
-    mentions: number;
-    totalRank: number;
-    rankedMentions: number;
-    positiveSentiment: number;
-  }>);
+
+      return stats;
+    },
+    {} as Record<
+      string,
+      {
+        mentions: number;
+        totalRank: number;
+        rankedMentions: number;
+        positiveSentiment: number;
+      }
+    >
+  );
 
   // Calculate average ranks
-  const processedLLMStats = Object.entries(llmStats).reduce((processed, [provider, stats]) => {
-    processed[provider] = {
-      mentions: stats.mentions,
-      avgRank: stats.rankedMentions > 0 ? stats.totalRank / stats.rankedMentions : 0,
-      positiveSentiment: stats.positiveSentiment,
-    };
-    return processed;
-  }, {} as Record<string, {
-    mentions: number;
-    avgRank: number;
-    positiveSentiment: number;
-  }>);
+  const processedLLMStats = Object.entries(llmStats).reduce(
+    (processed, [provider, stats]) => {
+      processed[provider] = {
+        mentions: stats.mentions,
+        avgRank:
+          stats.rankedMentions > 0 ? stats.totalRank / stats.rankedMentions : 0,
+        positiveSentiment: stats.positiveSentiment,
+      };
+      return processed;
+    },
+    {} as Record<
+      string,
+      {
+        mentions: number;
+        avgRank: number;
+        positiveSentiment: number;
+      }
+    >
+  );
 
-  const avgConfidence = results.reduce((acc, r) => acc + r.confidence, 0) / results.length;
+  const avgConfidence =
+    results.reduce((acc, r) => acc + r.confidence, 0) / results.length;
 
   // Topic distribution
   const topicCounts = results.reduce((acc, r) => {
@@ -119,13 +117,13 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
             <Badge variant="outline">{mentionRate.toFixed(1)}%</Badge>
           </div>
           <Progress value={mentionRate} className="w-full" />
-          
+
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Avg. Confidence</span>
             <Badge variant="outline">{avgConfidence.toFixed(1)}%</Badge>
           </div>
           <Progress value={avgConfidence} className="w-full" />
-          
+
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="flex items-center space-x-1">
               <TrendingUp className="h-3 w-3 text-success" />
@@ -164,8 +162,8 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
                   )}
                 </div>
               </div>
-              <Progress 
-                value={(stats.mentions / totalResults) * 100} 
+              <Progress
+                value={(stats.mentions / totalResults) * 100}
                 className="h-2"
               />
               <div className="text-xs text-muted-foreground">
@@ -191,13 +189,10 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium truncate">{topic}</span>
                 <Badge variant="outline" className="text-xs">
-                  {count} analysis{count > 1 ? 'es' : ''}
+                  {count} analysis{count > 1 ? "es" : ""}
                 </Badge>
               </div>
-              <Progress 
-                value={(count / totalResults) * 100} 
-                className="h-2"
-              />
+              <Progress value={(count / totalResults) * 100} className="h-2" />
             </div>
           ))}
         </CardContent>
@@ -214,8 +209,8 @@ export function SentimentChart({ results }: { results: AnalysisResult[] }) {
     neutral: 0,
   };
 
-  results.forEach(result => {
-    result.llm_results.forEach(llm => {
+  results.forEach((result) => {
+    result.llm_results.forEach((llm) => {
       if (llm.is_mentioned && llm.sentiment_score !== null) {
         if (llm.sentiment_score > 0.1) {
           sentimentCounts.positive++;
@@ -244,22 +239,23 @@ export function SentimentChart({ results }: { results: AnalysisResult[] }) {
         {Object.entries(sentimentCounts).map(([sentiment, count]) => (
           <div key={sentiment} className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium capitalize">{sentiment}</span>
-              <Badge 
-                variant="outline" 
+              <span className="text-sm font-medium capitalize">
+                {sentiment}
+              </span>
+              <Badge
+                variant="outline"
                 className={`text-xs ${
-                  sentiment === 'positive' ? 'border-success text-success' :
-                  sentiment === 'negative' ? 'border-destructive text-destructive' :
-                  'border-warning text-warning'
+                  sentiment === "positive"
+                    ? "border-success text-success"
+                    : sentiment === "negative"
+                    ? "border-destructive text-destructive"
+                    : "border-warning text-warning"
                 }`}
               >
                 {count} ({((count / total) * 100).toFixed(1)}%)
               </Badge>
             </div>
-            <Progress 
-              value={(count / total) * 100} 
-              className="h-2"
-            />
+            <Progress value={(count / total) * 100} className="h-2" />
           </div>
         ))}
       </CardContent>
@@ -278,8 +274,8 @@ export function RankingChart({ results }: { results: AnalysisResult[] }) {
     "5+": 0,
   };
 
-  results.forEach(result => {
-    result.llm_results.forEach(llm => {
+  results.forEach((result) => {
+    result.llm_results.forEach((llm) => {
       if (llm.is_mentioned && llm.rank_position) {
         if (llm.rank_position <= 5) {
           rankingData[llm.rank_position as keyof typeof rankingData]++;
@@ -311,10 +307,7 @@ export function RankingChart({ results }: { results: AnalysisResult[] }) {
                 {count} mentions
               </Badge>
             </div>
-            <Progress 
-              value={(count / totalRanked) * 100} 
-              className="h-2"
-            />
+            <Progress value={(count / totalRanked) * 100} className="h-2" />
           </div>
         ))}
       </CardContent>

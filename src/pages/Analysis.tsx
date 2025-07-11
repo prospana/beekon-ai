@@ -53,23 +53,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-interface LLMData {
-  mentioned: boolean;
-  rank: number | null;
-  sentiment: string | null;
-  response?: string;
-}
-
-interface LegacyAnalysisResult {
-  id: string;
-  prompt: string;
-  chatgpt: LLMData;
-  claude: LLMData;
-  gemini: LLMData;
-  topic: string;
-  timestamp: string;
-  confidence: number;
-}
+// LegacyAnalysisResult interface removed - now using modern AnalysisResult directly
 
 export default function Analysis() {
   const { toast } = useToast();
@@ -83,8 +67,9 @@ export default function Analysis() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedResult, setSelectedResult] =
-    useState<LegacyAnalysisResult | null>(null);
+  const [selectedResult, setSelectedResult] = useState<AnalysisResult | null>(
+    null
+  );
   const [isFiltering, setIsFiltering] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
@@ -132,6 +117,9 @@ export default function Analysis() {
         selectedWebsite,
         filters
       );
+
+      console.log("results", results);
+
       setAnalysisResults(results);
     } catch (error) {
       console.error("Failed to load analysis results:", error);
@@ -310,69 +298,11 @@ export default function Analysis() {
   };
 
   const handleViewDetails = (result: AnalysisResult) => {
-    // Convert to legacy format for the modal (temporary until modal is updated)
-    const legacyResult: LegacyAnalysisResult = {
-      id: result.id,
-      prompt: result.prompt,
-      chatgpt: {
-        mentioned:
-          result.llm_results.find((r) => r.llm_provider === "chatgpt")
-            ?.is_mentioned || false,
-        rank:
-          result.llm_results.find((r) => r.llm_provider === "chatgpt")
-            ?.rank_position || null,
-        sentiment: getSentimentFromScore(
-          result.llm_results.find((r) => r.llm_provider === "chatgpt")
-            ?.sentiment_score || null
-        ),
-        response:
-          result.llm_results.find((r) => r.llm_provider === "chatgpt")
-            ?.response_text || undefined,
-      },
-      claude: {
-        mentioned:
-          result.llm_results.find((r) => r.llm_provider === "claude")
-            ?.is_mentioned || false,
-        rank:
-          result.llm_results.find((r) => r.llm_provider === "claude")
-            ?.rank_position || null,
-        sentiment: getSentimentFromScore(
-          result.llm_results.find((r) => r.llm_provider === "claude")
-            ?.sentiment_score || null
-        ),
-        response:
-          result.llm_results.find((r) => r.llm_provider === "claude")
-            ?.response_text || undefined,
-      },
-      gemini: {
-        mentioned:
-          result.llm_results.find((r) => r.llm_provider === "gemini")
-            ?.is_mentioned || false,
-        rank:
-          result.llm_results.find((r) => r.llm_provider === "gemini")
-            ?.rank_position || null,
-        sentiment: getSentimentFromScore(
-          result.llm_results.find((r) => r.llm_provider === "gemini")
-            ?.sentiment_score || null
-        ),
-        response:
-          result.llm_results.find((r) => r.llm_provider === "gemini")
-            ?.response_text || undefined,
-      },
-      topic: result.topic,
-      timestamp: result.created_at,
-      confidence: result.confidence,
-    };
-    setSelectedResult(legacyResult);
+    setSelectedResult(result);
     setIsDetailModalOpen(true);
   };
 
-  const getSentimentFromScore = (score: number | null): string | null => {
-    if (score === null) return null;
-    if (score > 0.1) return "positive";
-    if (score < -0.1) return "negative";
-    return "neutral";
-  };
+  // getSentimentFromScore function removed - now handled in DetailedAnalysisModal
 
   const handleClearFilters = () => {
     setSelectedTopic("all");

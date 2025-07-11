@@ -446,14 +446,176 @@ export class AnalysisService {
     analysisIds: string[],
     format: "pdf" | "csv" | "json"
   ): Promise<Blob> {
-    // This would integrate with the export service
-    // For now, returning a mock blob
-    const mockData = JSON.stringify({
-      analysisIds,
-      format,
-      timestamp: new Date().toISOString(),
+    try {
+      // Fetch all analysis results for the given IDs
+      const { data, error } = await supabase
+        .schema("beekon_data")
+        .from("llm_analysis_results")
+        .select(`
+          *,
+          prompts (
+            id,
+            prompt_text,
+            topics (
+              topic_name,
+              topic_keywords
+            )
+          )
+        `)
+        .in("prompt_id", analysisIds);
+
+      if (error) throw error;
+
+      // Transform data to AnalysisResult format
+      const resultsMap = new Map<string, AnalysisResult>();
+      
+      data?.forEach((row) => {
+        const promptId = row.prompt_id;
+        if (!promptId) return;
+
+        if (!resultsMap.has(promptId)) {
+          resultsMap.set(promptId, {
+            id: promptId,
+            prompt: (row.prompts as any)?.prompt_text || 'Unknown prompt',
+            website_id: row.website_id,
+            topic: (row.prompts as any)?.topics?.topic_name || 'Unknown topic',
+            status: "completed",
+            confidence: row.confidence_score || 0,
+            created_at: row.analyzed_at || row.created_at || new Date().toISOString(),
+            updated_at: row.created_at || new Date().toISOString(),
+            llm_results: [],
+          });
+        }
+
+        const analysisResult = resultsMap.get(promptId)!;
+        analysisResult.llm_results.push({
+          llm_provider: row.llm_provider,
+          is_mentioned: row.is_mentioned || false,
+          rank_position: row.rank_position,
+          confidence_score: row.confidence_score,
+          sentiment_score: row.sentiment_score,
+          summary_text: row.summary_text,
+          response_text: row.response_text,
+          analyzed_at: row.analyzed_at || new Date().toISOString(),
+        });
+      });
+
+      const results = Array.from(resultsMap.values());
+
+      // Generate export based on format
+      switch (format) {
+        case "json":
+          return this.generateJsonExport(results);
+        case "csv":
+          return this.generateCsvExport(results);
+        case "pdf":
+          return this.generatePdfExport(results);
+        default:
+          throw new Error(`Unsupported export format: ${format}`);
+      }
+    } catch (error) {
+      console.error("Failed to export analysis results:", error);
+      throw error;
+    }
+  }
+
+  private generateJsonExport(results: AnalysisResult[]): Blob {
+    const exportData = {
+      analysisResults: results,
+      exportedAt: new Date().toISOString(),
+      totalResults: results.length,
+      totalLLMResults: results.reduce((sum, r) => sum + r.llm_results.length, 0),
+    };
+
+    return new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
     });
-    return new Blob([mockData], { type: "application/json" });
+  }
+
+  private generateCsvExport(results: AnalysisResult[]): Blob {
+    const headers = [
+      "Analysis ID",
+      "Prompt",
+      "Topic",
+      "Website ID",
+      "Status",
+      "Confidence",
+      "Created At",
+      "LLM Provider",
+      "Mentioned",
+      "Rank Position",
+      "Confidence Score",
+      "Sentiment Score",
+      "Response Text",
+      "Analyzed At"
+    ];
+
+    let csvContent = headers.join(",") + "\n";
+
+    results.forEach((result) => {
+      result.llm_results.forEach((llmResult) => {
+        const row = [
+          result.id,
+          `"${result.prompt.replace(/"/g, '""')}"`, // Escape quotes
+          result.topic,
+          result.website_id,
+          result.status,
+          result.confidence,
+          result.created_at,
+          llmResult.llm_provider,
+          llmResult.is_mentioned ? "Yes" : "No",
+          llmResult.rank_position || "",
+          llmResult.confidence_score || "",
+          llmResult.sentiment_score || "",
+          `"${(llmResult.response_text || "").replace(/"/g, '""')}"`, // Escape quotes
+          llmResult.analyzed_at
+        ];
+        csvContent += row.join(",") + "\n";
+      });
+    });
+
+    return new Blob([csvContent], { type: "text/csv" });
+  }
+
+  private generatePdfExport(results: AnalysisResult[]): Blob {
+    // For now, generate a structured text document that can be saved as PDF
+    // In a production environment, you would use a PDF library like jsPDF or Puppeteer
+    
+    let pdfContent = "ANALYSIS RESULTS EXPORT\n";
+    pdfContent += "========================\n\n";
+    pdfContent += `Exported on: ${new Date().toLocaleString()}\n`;
+    pdfContent += `Total Analysis Results: ${results.length}\n`;
+    pdfContent += `Total LLM Results: ${results.reduce((sum, r) => sum + r.llm_results.length, 0)}\n\n`;
+
+    results.forEach((result, index) => {
+      pdfContent += `${index + 1}. ANALYSIS RESULT\n`;
+      pdfContent += `-`.repeat(50) + "\n";
+      pdfContent += `ID: ${result.id}\n`;
+      pdfContent += `Prompt: ${result.prompt}\n`;
+      pdfContent += `Topic: ${result.topic}\n`;
+      pdfContent += `Confidence: ${result.confidence}%\n`;
+      pdfContent += `Created: ${new Date(result.created_at).toLocaleString()}\n\n`;
+
+      pdfContent += "LLM RESULTS:\n";
+      result.llm_results.forEach((llm, llmIndex) => {
+        pdfContent += `  ${llmIndex + 1}. ${llm.llm_provider.toUpperCase()}\n`;
+        pdfContent += `     Mentioned: ${llm.is_mentioned ? "Yes" : "No"}\n`;
+        if (llm.rank_position) {
+          pdfContent += `     Rank: ${llm.rank_position}\n`;
+        }
+        if (llm.sentiment_score !== null) {
+          pdfContent += `     Sentiment: ${llm.sentiment_score > 0.1 ? "Positive" : llm.sentiment_score < -0.1 ? "Negative" : "Neutral"}\n`;
+        }
+        if (llm.response_text) {
+          pdfContent += `     Response: ${llm.response_text}\n`;
+        }
+        pdfContent += "\n";
+      });
+      
+      pdfContent += "\n";
+    });
+
+    return new Blob([pdfContent], { type: "text/plain" });
   }
 }
 
