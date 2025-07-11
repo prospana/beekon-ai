@@ -285,7 +285,7 @@ export class AnalysisService {
           website_id: websiteId,
           topic: prompt.topics.topic_name,
           status: "completed" as AnalysisStatus,
-          confidence: 100 || 0,
+          confidence: row.confidence_score || 0,
           created_at: row.created_at || "",
           updated_at: row.created_at || "",
           llm_results: [],

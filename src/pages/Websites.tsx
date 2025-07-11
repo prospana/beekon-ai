@@ -30,8 +30,9 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Website, useWorkspace } from "@/hooks/useWorkspace";
+import { useWorkspace, Website } from "@/hooks/useWorkspace";
 import { sendN8nWebhook } from "@/lib/http-request";
+import { dashboardService } from "@/services/dashboardService";
 import {
   BarChart3,
   Calendar,
@@ -55,7 +56,7 @@ export default function Websites() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [websiteToDelete, setWebsiteToDelete] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [websiteMetrics, _] = useState<
+  const [websiteMetrics, setWebsiteMetrics] = useState<
     Record<string, { totalTopics: number; avgVisibility: number }>
   >({});
   const { toast } = useToast();
@@ -69,9 +70,19 @@ export default function Websites() {
   };
 
   // Get website metrics (placeholder implementation)
-  const getWebsiteMetrics = (websiteId: string) => {
+  const getWebsiteMetrics = async (websiteId: string) => {
     // This is a placeholder implementation
     // In a real application, this would fetch from the database
+
+    const websiteMetric = await dashboardService.getWebsitePerformance([
+      websiteId,
+    ]);
+    const topicMetrics = await dashboardService.getTopicPerformance([
+      websiteId,
+    ]);
+    console.log("websiteMetric", websiteMetric);
+    console.log("topicMetrics", topicMetrics);
+
     return (
       websiteMetrics[websiteId] || {
         totalTopics: Math.floor(Math.random() * 25) + 5, // Random between 5-30

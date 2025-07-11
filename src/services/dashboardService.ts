@@ -1,5 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-import { analysisService, type AnalysisResult, type LLMResult } from "./analysisService";
+import {
+  analysisService,
+  type AnalysisResult,
+  type LLMResult,
+} from "./analysisService";
 
 export interface DashboardMetrics {
   overallVisibilityScore: number;
@@ -69,18 +73,27 @@ export class DashboardService {
 
     try {
       // Get all analysis results for the websites
-      const allResults = await this.getAllAnalysisResults(websiteIds, dateRange);
-      
+      const allResults = await this.getAllAnalysisResults(
+        websiteIds,
+        dateRange
+      );
+
       if (allResults.length === 0) {
         return this.getEmptyMetrics();
       }
 
       // Calculate aggregated metrics
       const metrics = this.calculateAggregatedMetrics(allResults);
-      
+
       // Get trend data for comparison
-      const previousPeriodMetrics = await this.getPreviousPeriodMetrics(websiteIds, dateRange);
-      metrics.improvementTrend = this.calculateTrend(metrics.overallVisibilityScore, previousPeriodMetrics.overallVisibilityScore);
+      const previousPeriodMetrics = await this.getPreviousPeriodMetrics(
+        websiteIds,
+        dateRange
+      );
+      metrics.improvementTrend = this.calculateTrend(
+        metrics.overallVisibilityScore,
+        previousPeriodMetrics.overallVisibilityScore
+      );
 
       return metrics;
     } catch (error) {
@@ -109,8 +122,11 @@ export class DashboardService {
         end: endDate.toISOString(),
       };
 
-      const allResults = await this.getAllAnalysisResults(websiteIds, dateRange);
-      
+      const allResults = await this.getAllAnalysisResults(
+        websiteIds,
+        dateRange
+      );
+
       return this.aggregateByDate(allResults, startDate, endDate);
     } catch (error) {
       console.error("Failed to get time series data:", error);
@@ -154,7 +170,9 @@ export class DashboardService {
   /**
    * Get website performance comparison
    */
-  async getWebsitePerformance(websiteIds: string[]): Promise<WebsitePerformance[]> {
+  async getWebsitePerformance(
+    websiteIds: string[]
+  ): Promise<WebsitePerformance[]> {
     if (websiteIds.length === 0) return [];
 
     try {
@@ -163,7 +181,7 @@ export class DashboardService {
       for (const websiteId of websiteIds) {
         const results = await analysisService.getAnalysisResults(websiteId);
         const metrics = this.calculateMetricsForResults(results);
-        
+
         // Get website info
         const { data: website } = await supabase
           .schema("beekon_data")
@@ -206,36 +224,61 @@ export class DashboardService {
     return allResults;
   }
 
-  private calculateAggregatedMetrics(results: AnalysisResult[]): DashboardMetrics {
+  private calculateAggregatedMetrics(
+    results: AnalysisResult[]
+  ): DashboardMetrics {
     if (results.length === 0) return this.getEmptyMetrics();
 
     const allLLMResults: LLMResult[] = [];
     const topics = new Set<string>();
-    
-    results.forEach(result => {
+
+    results.forEach((result) => {
       allLLMResults.push(...result.llm_results);
       topics.add(result.topic);
     });
 
     // Calculate overall visibility (percentage of mentions)
     const totalLLMResults = allLLMResults.length;
-    const mentionedResults = allLLMResults.filter(r => r.is_mentioned);
-    const overallVisibilityScore = totalLLMResults > 0 ? 
-      Math.round((mentionedResults.length / totalLLMResults) * 100) : 0;
+    const mentionedResults = allLLMResults.filter((r) => r.is_mentioned);
+    const overallVisibilityScore =
+      totalLLMResults > 0
+        ? Math.round((mentionedResults.length / totalLLMResults) * 100)
+        : 0;
 
     // Calculate average ranking
-    const rankedResults = mentionedResults.filter(r => r.rank_position !== null);
-    const averageRanking = rankedResults.length > 0 ? 
-      Math.round((rankedResults.reduce((sum, r) => sum + (r.rank_position || 0), 0) / rankedResults.length) * 10) / 10 : 0;
+    const rankedResults = mentionedResults.filter(
+      (r) => r.rank_position !== null
+    );
+    const averageRanking =
+      rankedResults.length > 0
+        ? Math.round(
+            (rankedResults.reduce((sum, r) => sum + (r.rank_position || 0), 0) /
+              rankedResults.length) *
+              10
+          ) / 10
+        : 0;
 
     // Calculate sentiment score
-    const sentimentResults = allLLMResults.filter(r => r.sentiment_score !== null);
-    const sentimentScore = sentimentResults.length > 0 ? 
-      Math.round(((sentimentResults.reduce((sum, r) => sum + (r.sentiment_score || 0), 0) / sentimentResults.length) + 1) * 50) : 0;
+    const sentimentResults = allLLMResults.filter(
+      (r) => r.sentiment_score !== null
+    );
+    const sentimentScore =
+      sentimentResults.length > 0
+        ? Math.round(
+            (sentimentResults.reduce(
+              (sum, r) => sum + (r.sentiment_score || 0),
+              0
+            ) /
+              sentimentResults.length +
+              1) *
+              50
+          )
+        : 0;
 
     // Find top performing topic
     const topicPerformance = this.calculateTopicPerformance(results, 1);
-    const topPerformingTopic = topicPerformance.length > 0 ? topicPerformance[0]!.topic : null;
+    const topPerformingTopic =
+      topicPerformance.length > 0 ? topicPerformance[0]!.topic : null;
 
     return {
       overallVisibilityScore,
@@ -243,24 +286,32 @@ export class DashboardService {
       totalMentions: mentionedResults.length,
       sentimentScore,
       totalAnalyses: results.length,
-      activeWebsites: new Set(results.map(r => r.website_id)).size,
+      activeWebsites: new Set(results.map((r) => r.website_id)).size,
       topPerformingTopic,
       improvementTrend: 0, // Will be calculated separately
     };
   }
 
-  private calculateMetricsForResults(results: AnalysisResult[]): DashboardMetrics {
+  private calculateMetricsForResults(
+    results: AnalysisResult[]
+  ): DashboardMetrics {
     return this.calculateAggregatedMetrics(results);
   }
 
-  private calculateTopicPerformance(results: AnalysisResult[], limit: number): TopicPerformance[] {
-    const topicMap = new Map<string, {
-      results: AnalysisResult[];
-      llmResults: LLMResult[];
-    }>();
+  private calculateTopicPerformance(
+    results: AnalysisResult[],
+    limit: number
+  ): TopicPerformance[] {
+    const topicMap = new Map<
+      string,
+      {
+        results: AnalysisResult[];
+        llmResults: LLMResult[];
+      }
+    >();
 
     // Group results by topic
-    results.forEach(result => {
+    results.forEach((result) => {
       if (!topicMap.has(result.topic)) {
         topicMap.set(result.topic, { results: [], llmResults: [] });
       }
@@ -271,20 +322,36 @@ export class DashboardService {
 
     // Calculate performance for each topic
     const topicPerformance: TopicPerformance[] = [];
-    
+
     topicMap.forEach((data, topic) => {
-      const mentionedResults = data.llmResults.filter(r => r.is_mentioned);
+      const mentionedResults = data.llmResults.filter((r) => r.is_mentioned);
       const totalResults = data.llmResults.length;
-      
-      const visibility = totalResults > 0 ? (mentionedResults.length / totalResults) * 100 : 0;
-      
-      const rankedResults = mentionedResults.filter(r => r.rank_position !== null);
-      const averageRank = rankedResults.length > 0 ? 
-        rankedResults.reduce((sum, r) => sum + (r.rank_position || 0), 0) / rankedResults.length : 0;
-      
-      const sentimentResults = data.llmResults.filter(r => r.sentiment_score !== null);
-      const sentiment = sentimentResults.length > 0 ? 
-        ((sentimentResults.reduce((sum, r) => sum + (r.sentiment_score || 0), 0) / sentimentResults.length) + 1) * 50 : 0;
+
+      const visibility =
+        totalResults > 0 ? (mentionedResults.length / totalResults) * 100 : 0;
+
+      const rankedResults = mentionedResults.filter(
+        (r) => r.rank_position !== null
+      );
+      const averageRank =
+        rankedResults.length > 0
+          ? rankedResults.reduce((sum, r) => sum + (r.rank_position || 0), 0) /
+            rankedResults.length
+          : 0;
+
+      const sentimentResults = data.llmResults.filter(
+        (r) => r.sentiment_score !== null
+      );
+      const sentiment =
+        sentimentResults.length > 0
+          ? (sentimentResults.reduce(
+              (sum, r) => sum + (r.sentiment_score || 0),
+              0
+            ) /
+              sentimentResults.length +
+              1) *
+            50
+          : 0;
 
       topicPerformance.push({
         topic,
@@ -305,8 +372,8 @@ export class DashboardService {
     const llmMap = new Map<string, LLMResult[]>();
 
     // Group results by LLM provider
-    results.forEach(result => {
-      result.llm_results.forEach(llmResult => {
+    results.forEach((result) => {
+      result.llm_results.forEach((llmResult) => {
         if (!llmMap.has(llmResult.llm_provider)) {
           llmMap.set(llmResult.llm_provider, []);
         }
@@ -317,16 +384,34 @@ export class DashboardService {
     const llmPerformance: LLMPerformance[] = [];
 
     llmMap.forEach((llmResults, provider) => {
-      const mentionedResults = llmResults.filter(r => r.is_mentioned);
-      const mentionRate = llmResults.length > 0 ? (mentionedResults.length / llmResults.length) * 100 : 0;
-      
-      const rankedResults = mentionedResults.filter(r => r.rank_position !== null);
-      const averageRank = rankedResults.length > 0 ? 
-        rankedResults.reduce((sum, r) => sum + (r.rank_position || 0), 0) / rankedResults.length : 0;
-      
-      const sentimentResults = llmResults.filter(r => r.sentiment_score !== null);
-      const sentiment = sentimentResults.length > 0 ? 
-        ((sentimentResults.reduce((sum, r) => sum + (r.sentiment_score || 0), 0) / sentimentResults.length) + 1) * 50 : 0;
+      const mentionedResults = llmResults.filter((r) => r.is_mentioned);
+      const mentionRate =
+        llmResults.length > 0
+          ? (mentionedResults.length / llmResults.length) * 100
+          : 0;
+
+      const rankedResults = mentionedResults.filter(
+        (r) => r.rank_position !== null
+      );
+      const averageRank =
+        rankedResults.length > 0
+          ? rankedResults.reduce((sum, r) => sum + (r.rank_position || 0), 0) /
+            rankedResults.length
+          : 0;
+
+      const sentimentResults = llmResults.filter(
+        (r) => r.sentiment_score !== null
+      );
+      const sentiment =
+        sentimentResults.length > 0
+          ? (sentimentResults.reduce(
+              (sum, r) => sum + (r.sentiment_score || 0),
+              0
+            ) /
+              sentimentResults.length +
+              1) *
+            50
+          : 0;
 
       llmPerformance.push({
         provider: provider.charAt(0).toUpperCase() + provider.slice(1),
@@ -345,17 +430,20 @@ export class DashboardService {
     startDate: Date,
     endDate: Date
   ): TimeSeriesData[] {
-    const dateMap = new Map<string, {
-      mentions: number;
-      totalResults: number;
-      sentimentSum: number;
-      sentimentCount: number;
-    }>();
+    const dateMap = new Map<
+      string,
+      {
+        mentions: number;
+        totalResults: number;
+        sentimentSum: number;
+        sentimentCount: number;
+      }
+    >();
 
     // Initialize all dates in range
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
-      const dateKey = currentDate.toISOString().split('T')[0]!;
+      const dateKey = currentDate.toISOString().split("T")[0]!;
       dateMap.set(dateKey, {
         mentions: 0,
         totalResults: 0,
@@ -366,11 +454,13 @@ export class DashboardService {
     }
 
     // Aggregate results by date
-    results.forEach(result => {
-      result.llm_results.forEach(llmResult => {
-        const date = new Date(llmResult.analyzed_at).toISOString().split('T')[0]!;
+    results.forEach((result) => {
+      result.llm_results.forEach((llmResult) => {
+        const date = new Date(llmResult.analyzed_at)
+          .toISOString()
+          .split("T")[0]!;
         const data = dateMap.get(date);
-        
+
         if (data) {
           data.totalResults++;
           if (llmResult.is_mentioned) {
@@ -387,9 +477,12 @@ export class DashboardService {
     // Convert to time series format
     const timeSeriesData: TimeSeriesData[] = [];
     dateMap.forEach((data, date) => {
-      const visibility = data.totalResults > 0 ? (data.mentions / data.totalResults) * 100 : 0;
-      const sentiment = data.sentimentCount > 0 ? 
-        ((data.sentimentSum / data.sentimentCount) + 1) * 50 : 50;
+      const visibility =
+        data.totalResults > 0 ? (data.mentions / data.totalResults) * 100 : 0;
+      const sentiment =
+        data.sentimentCount > 0
+          ? (data.sentimentSum / data.sentimentCount + 1) * 50
+          : 50;
 
       timeSeriesData.push({
         date,
@@ -422,7 +515,10 @@ export class DashboardService {
       end: previousEnd.toISOString(),
     };
 
-    const previousResults = await this.getAllAnalysisResults(websiteIds, previousRange);
+    const previousResults = await this.getAllAnalysisResults(
+      websiteIds,
+      previousRange
+    );
     return this.calculateAggregatedMetrics(previousResults);
   }
 
@@ -493,9 +589,9 @@ export class DashboardService {
     topicPerformance: TopicPerformance[];
   }): string {
     const { metrics, timeSeriesData, topicPerformance } = data;
-    
+
     let csv = "Dashboard Export\n\n";
-    
+
     // Metrics section
     csv += "Metrics\n";
     csv += "Metric,Value\n";
@@ -507,7 +603,7 @@ export class DashboardService {
     csv += `Active Websites,${metrics.activeWebsites}\n`;
     csv += `Top Performing Topic,${metrics.topPerformingTopic || "N/A"}\n`;
     csv += `Improvement Trend,${metrics.improvementTrend}%\n\n`;
-    
+
     // Time series data
     csv += "Time Series Data\n";
     csv += "Date,Visibility,Mentions,Sentiment\n";
@@ -515,14 +611,14 @@ export class DashboardService {
       csv += `${item.date},${item.visibility},${item.mentions},${item.sentiment}\n`;
     });
     csv += "\n";
-    
+
     // Topic performance
     csv += "Topic Performance\n";
     csv += "Topic,Visibility,Mentions,Average Rank,Sentiment\n";
     topicPerformance.forEach((item: TopicPerformance) => {
       csv += `${item.topic},${item.visibility},${item.mentions},${item.averageRank},${item.sentiment}\n`;
     });
-    
+
     return csv;
   }
 }
