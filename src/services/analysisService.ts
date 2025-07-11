@@ -451,7 +451,8 @@ export class AnalysisService {
       const { data, error } = await supabase
         .schema("beekon_data")
         .from("llm_analysis_results")
-        .select(`
+        .select(
+          `
           *,
           prompts (
             id,
@@ -461,14 +462,15 @@ export class AnalysisService {
               topic_keywords
             )
           )
-        `)
+        `
+        )
         .in("prompt_id", analysisIds);
 
       if (error) throw error;
 
       // Transform data to AnalysisResult format
       const resultsMap = new Map<string, AnalysisResult>();
-      
+
       data?.forEach((row) => {
         const promptId = row.prompt_id;
         if (!promptId) return;
@@ -476,12 +478,13 @@ export class AnalysisService {
         if (!resultsMap.has(promptId)) {
           resultsMap.set(promptId, {
             id: promptId,
-            prompt: (row.prompts as any)?.prompt_text || 'Unknown prompt',
+            prompt: (row.prompts as any)?.prompt_text || "Unknown prompt",
             website_id: row.website_id,
-            topic: (row.prompts as any)?.topics?.topic_name || 'Unknown topic',
+            topic: (row.prompts as any)?.topics?.topic_name || "Unknown topic",
             status: "completed",
             confidence: row.confidence_score || 0,
-            created_at: row.analyzed_at || row.created_at || new Date().toISOString(),
+            created_at:
+              row.analyzed_at || row.created_at || new Date().toISOString(),
             updated_at: row.created_at || new Date().toISOString(),
             llm_results: [],
           });
@@ -524,7 +527,10 @@ export class AnalysisService {
       analysisResults: results,
       exportedAt: new Date().toISOString(),
       totalResults: results.length,
-      totalLLMResults: results.reduce((sum, r) => sum + r.llm_results.length, 0),
+      totalLLMResults: results.reduce(
+        (sum, r) => sum + r.llm_results.length,
+        0
+      ),
     };
 
     return new Blob([JSON.stringify(exportData, null, 2)], {
@@ -547,7 +553,7 @@ export class AnalysisService {
       "Confidence Score",
       "Sentiment Score",
       "Response Text",
-      "Analyzed At"
+      "Analyzed At",
     ];
 
     let csvContent = headers.join(",") + "\n";
@@ -568,7 +574,7 @@ export class AnalysisService {
           llmResult.confidence_score || "",
           llmResult.sentiment_score || "",
           `"${(llmResult.response_text || "").replace(/"/g, '""')}"`, // Escape quotes
-          llmResult.analyzed_at
+          llmResult.analyzed_at,
         ];
         csvContent += row.join(",") + "\n";
       });
@@ -580,12 +586,15 @@ export class AnalysisService {
   private generatePdfExport(results: AnalysisResult[]): Blob {
     // For now, generate a structured text document that can be saved as PDF
     // In a production environment, you would use a PDF library like jsPDF or Puppeteer
-    
+
     let pdfContent = "ANALYSIS RESULTS EXPORT\n";
     pdfContent += "========================\n\n";
     pdfContent += `Exported on: ${new Date().toLocaleString()}\n`;
     pdfContent += `Total Analysis Results: ${results.length}\n`;
-    pdfContent += `Total LLM Results: ${results.reduce((sum, r) => sum + r.llm_results.length, 0)}\n\n`;
+    pdfContent += `Total LLM Results: ${results.reduce(
+      (sum, r) => sum + r.llm_results.length,
+      0
+    )}\n\n`;
 
     results.forEach((result, index) => {
       pdfContent += `${index + 1}. ANALYSIS RESULT\n`;
@@ -594,7 +603,9 @@ export class AnalysisService {
       pdfContent += `Prompt: ${result.prompt}\n`;
       pdfContent += `Topic: ${result.topic}\n`;
       pdfContent += `Confidence: ${result.confidence}%\n`;
-      pdfContent += `Created: ${new Date(result.created_at).toLocaleString()}\n\n`;
+      pdfContent += `Created: ${new Date(
+        result.created_at
+      ).toLocaleString()}\n\n`;
 
       pdfContent += "LLM RESULTS:\n";
       result.llm_results.forEach((llm, llmIndex) => {
@@ -604,14 +615,20 @@ export class AnalysisService {
           pdfContent += `     Rank: ${llm.rank_position}\n`;
         }
         if (llm.sentiment_score !== null) {
-          pdfContent += `     Sentiment: ${llm.sentiment_score > 0.1 ? "Positive" : llm.sentiment_score < -0.1 ? "Negative" : "Neutral"}\n`;
+          pdfContent += `     Sentiment: ${
+            llm.sentiment_score > 0.1
+              ? "Positive"
+              : llm.sentiment_score < -0.1
+              ? "Negative"
+              : "Neutral"
+          }\n`;
         }
         if (llm.response_text) {
           pdfContent += `     Response: ${llm.response_text}\n`;
         }
         pdfContent += "\n";
       });
-      
+
       pdfContent += "\n";
     });
 
