@@ -1,9 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
-
-type ApiKeyRow = Database['beekon_data']['Tables']['api_keys']['Row'];
-type ApiKeyInsert = Database['beekon_data']['Tables']['api_keys']['Insert'];
-type ApiKeyUpdate = Database['beekon_data']['Tables']['api_keys']['Update'];
+import { ApiKey, ApiKeyInsert, ApiKeyUpdate } from "@/types/database";
+import BaseService from "./baseService";
 
 // Browser-compatible crypto functions
 const generateRandomBytes = (length: number): Uint8Array => {
@@ -23,7 +20,7 @@ const sha256 = async (data: string): Promise<string> => {
   return arrayBufferToHex(hashBuffer);
 };
 
-export type ApiKey = ApiKeyRow;
+// ApiKey is now imported from database types
 
 export interface ApiKeyWithSecret extends Omit<ApiKey, "key_hash"> {
   key: string; // Only available immediately after creation
@@ -36,8 +33,9 @@ export interface ApiKeyUsage {
   last_30_days: number;
 }
 
-export class ApiKeyService {
+export class ApiKeyService extends BaseService {
   private static instance: ApiKeyService;
+  protected serviceName = 'api-key' as const;
 
   public static getInstance(): ApiKeyService {
     if (!ApiKeyService.instance) {
@@ -50,7 +48,12 @@ export class ApiKeyService {
    * Generate a new API key
    */
   async generateApiKey(userId: string, name: string): Promise<ApiKeyWithSecret> {
-    try {
+    return this.executeOperation('generateApiKey', async () => {
+      this.validateUUID(userId, 'userId');
+      this.validateRequired({ name }, ['name']);
+      this.validateStringLength(name, 'name', 1, 100);
+      this.logOperation('generateApiKey', { userId, name });
+
       // Generate a secure random key
       const keyBytes = generateRandomBytes(32);
       const keyString = `bk_${Date.now()}_${arrayBufferToHex(keyBytes)}`;
@@ -59,6 +62,7 @@ export class ApiKeyService {
 
       // Check if name already exists for this user
       const { data: existingKey } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .select("id")
         .eq("user_id", userId)
@@ -71,6 +75,7 @@ export class ApiKeyService {
 
       // Insert the new API key
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .insert({
           user_id: userId,
@@ -89,10 +94,7 @@ export class ApiKeyService {
         ...data,
         key: keyString, // Return the actual key only this once
       };
-    } catch (error) {
-      console.error("Failed to generate API key:", error);
-      throw error;
-    }
+    });
   }
 
   /**
@@ -101,6 +103,7 @@ export class ApiKeyService {
   async getApiKeys(userId: string): Promise<ApiKey[]> {
     try {
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .select("*")
         .eq("user_id", userId)
@@ -121,6 +124,7 @@ export class ApiKeyService {
   async revokeApiKey(userId: string, keyId: string): Promise<void> {
     try {
       const { error } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .update({ is_active: false })
         .eq("id", keyId)
@@ -139,6 +143,7 @@ export class ApiKeyService {
   async deleteApiKey(userId: string, keyId: string): Promise<void> {
     try {
       const { error } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .delete()
         .eq("id", keyId)
@@ -159,6 +164,7 @@ export class ApiKeyService {
       const keyHash = await sha256(keyString);
 
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .select("*")
         .eq("key_hash", keyHash)
@@ -169,6 +175,7 @@ export class ApiKeyService {
 
       // Update usage count and last used
       await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .update({
           usage_count: data.usage_count + 1,
@@ -189,6 +196,7 @@ export class ApiKeyService {
   async getApiKeyUsage(userId: string): Promise<ApiKeyUsage> {
     try {
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .select("usage_count, is_active, last_used_at")
         .eq("user_id", userId);
@@ -234,6 +242,7 @@ export class ApiKeyService {
     try {
       // Check if name already exists for this user
       const { data: existingKey } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .select("id")
         .eq("user_id", userId)
@@ -246,6 +255,7 @@ export class ApiKeyService {
       }
 
       const { error } = await supabase
+        .schema("beekon_data")
         .from("api_keys")
         .update({ name: newName })
         .eq("id", keyId)

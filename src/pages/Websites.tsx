@@ -31,8 +31,8 @@ import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkspace, Website } from "@/hooks/useWorkspace";
+import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
-import { dashboardService } from "@/services/dashboardService";
 import {
   BarChart3,
   Calendar,
@@ -44,7 +44,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Websites() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -69,26 +69,48 @@ export default function Websites() {
     return domain;
   };
 
+  useEffect(() => {
+    websites?.forEach(async (website) => {
+      await getTotalTopics(website.id);
+    });
+  }, [websites]);
+
+  const getTotalTopics = async (websiteId: string) => {
+    const totalTopics = await supabase
+      .schema("beekon_data")
+      .from("topics")
+      .select("*", { count: "exact", head: true })
+      .eq("website_id", websiteId);
+
+    const visibility = await supabase
+      .schema("beekon_data")
+      .from("llm_analysis_results")
+      .select("is_mentioned")
+      .eq("website_id", websiteId);
+
+    const items = visibility.data ?? [];
+
+    const totalItems = items.length;
+    const visibleCount = items.filter((item) => item.is_mentioned).length;
+
+    const visibilityPercentage =
+      totalItems > 0 ? (visibleCount / totalItems) * 100 : 0;
+
+    setWebsiteMetrics((prev) => ({
+      ...prev,
+      [websiteId]: {
+        totalTopics: totalTopics.count ?? 0,
+        avgVisibility: Math.round(visibilityPercentage),
+      },
+    }));
+  };
+
   // Get website metrics (placeholder implementation)
-  const getWebsiteMetrics = async (websiteId: string) => {
+  const getWebsiteMetrics = (websiteId: string) => {
     // This is a placeholder implementation
     // In a real application, this would fetch from the database
 
-    const websiteMetric = await dashboardService.getWebsitePerformance([
-      websiteId,
-    ]);
-    const topicMetrics = await dashboardService.getTopicPerformance([
-      websiteId,
-    ]);
-    console.log("websiteMetric", websiteMetric);
-    console.log("topicMetrics", topicMetrics);
-
-    return (
-      websiteMetrics[websiteId] || {
-        totalTopics: Math.floor(Math.random() * 25) + 5, // Random between 5-30
-        avgVisibility: Math.floor(Math.random() * 40) + 60, // Random between 60-100%
-      }
-    );
+    return websiteMetrics[websiteId] ?? [];
   };
 
   const handleAddWebsite = async () => {

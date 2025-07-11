@@ -1,16 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { analysisService, type AnalysisResult } from "./analysisService";
-import { dashboardService, type DashboardMetrics } from "./dashboardService";
-
-export interface Competitor {
-  id: string;
-  website_id: string;
-  competitor_domain: string;
-  competitor_name: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import { Competitor, CompetitorInsert, CompetitorUpdate, AnalysisResult, LLMResult } from "@/types/database";
+import BaseService from "./baseService";
 
 export interface CompetitorPerformance {
   competitorId: string;
@@ -62,8 +52,9 @@ export interface CompetitorAnalytics {
   timeSeriesData: CompetitorTimeSeriesData[];
 }
 
-export class CompetitorService {
+export class CompetitorService extends BaseService {
   private static instance: CompetitorService;
+  protected serviceName = 'website' as const;
 
   public static getInstance(): CompetitorService {
     if (!CompetitorService.instance) {
@@ -224,12 +215,12 @@ export class CompetitorService {
     try {
       const [competitors, yourBrandResults] = await Promise.all([
         this.getCompetitorPerformance(websiteId, dateRange),
-        analysisService.getAnalysisResults(websiteId, { dateRange }),
+        this.getAnalysisResultsForWebsite(websiteId, dateRange),
       ]);
 
       // Calculate your brand's metrics
-      const yourBrandMetrics = await dashboardService.getDashboardMetrics(
-        [websiteId],
+      const yourBrandMetrics = await this.getDashboardMetricsForWebsite(
+        websiteId,
         dateRange
       );
 
@@ -570,6 +561,104 @@ export class CompetitorService {
     });
 
     return csv;
+  }
+
+  /**
+   * Get analysis results for a website directly from database
+   */
+  private async getAnalysisResultsForWebsite(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<AnalysisResult[]> {
+    return this.executeOperation('getAnalysisResultsForWebsite', async () => {
+      let query = supabase
+        .schema("beekon_data")
+        .from("llm_analysis_results")
+        .select(`
+          *,
+          prompts (*)
+        `)
+        .eq("website_id", websiteId);
+
+      if (dateRange) {
+        query = query
+          .gte("analyzed_at", dateRange.start)
+          .lte("analyzed_at", dateRange.end);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Transform the data to match AnalysisResult format
+      const resultsMap = new Map<string, AnalysisResult>();
+      
+      data?.forEach((result) => {
+        const topicName = result.prompts?.topic_name || 'Unknown Topic';
+        const topicKeywords = result.prompts?.topic_keywords || [];
+        
+        if (!resultsMap.has(topicName)) {
+          resultsMap.set(topicName, {
+            topic_name: topicName,
+            topic_keywords: topicKeywords,
+            llm_results: [],
+            total_mentions: 0,
+            avg_rank: null,
+            avg_confidence: null,
+            avg_sentiment: null,
+          });
+        }
+
+        const analysisResult = resultsMap.get(topicName)!;
+        analysisResult.llm_results.push({
+          llm_provider: result.llm_provider,
+          is_mentioned: result.is_mentioned || false,
+          rank_position: result.rank_position,
+          confidence_score: result.confidence_score,
+          sentiment_score: result.sentiment_score,
+          summary_text: result.summary_text,
+          response_text: result.response_text,
+          analyzed_at: result.analyzed_at || new Date().toISOString(),
+        });
+      });
+
+      return Array.from(resultsMap.values());
+    });
+  }
+
+  /**
+   * Get dashboard metrics for a website directly from database
+   */
+  private async getDashboardMetricsForWebsite(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<{ overallVisibilityScore: number }> {
+    return this.executeOperation('getDashboardMetricsForWebsite', async () => {
+      let query = supabase
+        .schema("beekon_data")
+        .from("llm_analysis_results")
+        .select("is_mentioned, rank_position, confidence_score, sentiment_score")
+        .eq("website_id", websiteId);
+
+      if (dateRange) {
+        query = query
+          .gte("analyzed_at", dateRange.start)
+          .lte("analyzed_at", dateRange.end);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return { overallVisibilityScore: 0 };
+      }
+
+      const mentionedResults = data.filter(result => result.is_mentioned);
+      const overallVisibilityScore = Math.round(
+        (mentionedResults.length / data.length) * 100
+      );
+
+      return { overallVisibilityScore };
+    });
   }
 }
 

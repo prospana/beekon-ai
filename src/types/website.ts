@@ -1,31 +1,9 @@
 // Website type definitions for Beekon.ai
+import { Website as DatabaseWebsite, WebsiteWithMetrics } from "./database";
 
-export interface Website {
-  id: string; // UUID from database
-  domain: string;
-  display_name: string | null; // Matches database field name
-  crawl_status: string | null; // Matches database field name
-  is_active: boolean | null; // Matches database field name
-  last_crawled_at: string | null; // Matches database field name
-  workspace_id: string | null; // Matches database field name
-  created_at: string | null; // Matches database field name
-  updated_at: string | null; // Matches database field name
-  // Extended fields for UI (these might be stored in settings or calculated)
-  totalTopics?: number;
-  avgVisibility?: number;
-  description?: string;
-  analysisFrequency?: "daily" | "weekly" | "bi-weekly" | "monthly";
-  autoAnalysis?: boolean;
-  notifications?: boolean;
-  competitorTracking?: boolean;
-  weeklyReports?: boolean;
-  showInDashboard?: boolean;
-  priorityLevel?: "high" | "medium" | "low";
-  customLabels?: string;
-  apiAccess?: boolean;
-  dataRetention?: "30" | "90" | "180" | "365";
-  exportEnabled?: boolean;
-}
+// Re-export database types for backward compatibility
+export type Website = DatabaseWebsite;
+export type WebsiteWithUI = WebsiteWithMetrics;
 
 // UI-friendly version with computed fields
 export interface WebsiteDisplay {
@@ -115,4 +93,5 @@ export interface WebsiteSettings {
   export_enabled: boolean;
   created_at?: string;
   updated_at?: string;
+  description?: string;
 }

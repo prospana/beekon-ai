@@ -1,10 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
-
-type WebsiteSettingsRow = Database['beekon_data']['Tables']['website_settings']['Row'];
-type WebsiteSettingsInsert = Database['beekon_data']['Tables']['website_settings']['Insert'];
-type WebsiteSettingsUpdate = Database['beekon_data']['Tables']['website_settings']['Update'];
 import { WebsiteSettings } from "@/types/website";
+
+type WebsiteSettingsRow =
+  Database["beekon_data"]["Tables"]["website_settings"]["Row"];
+type WebsiteSettingsInsert =
+  Database["beekon_data"]["Tables"]["website_settings"]["Insert"];
+type WebsiteSettingsUpdate =
+  Database["beekon_data"]["Tables"]["website_settings"]["Update"];
 
 export interface WebsiteSettingsUpdateData {
   analysis_frequency?: "daily" | "weekly" | "bi-weekly" | "monthly";
@@ -18,6 +21,7 @@ export interface WebsiteSettingsUpdateData {
   api_access?: boolean;
   data_retention?: "30" | "90" | "180" | "365";
   export_enabled?: boolean;
+  description?: string;
 }
 
 export class WebsiteSettingsService {
@@ -52,10 +56,12 @@ export class WebsiteSettingsService {
         return {
           id: settingsData.id,
           website_id: settingsData.website_id,
-          analysis_frequency: settingsData.settings?.analysis_frequency || "weekly",
+          analysis_frequency:
+            settingsData.settings?.analysis_frequency || "weekly",
           auto_analysis: settingsData.settings?.auto_analysis ?? true,
           notifications: settingsData.settings?.notifications ?? true,
-          competitor_tracking: settingsData.settings?.competitor_tracking ?? false,
+          competitor_tracking:
+            settingsData.settings?.competitor_tracking ?? false,
           weekly_reports: settingsData.settings?.weekly_reports ?? true,
           show_in_dashboard: settingsData.settings?.show_in_dashboard ?? true,
           priority_level: settingsData.settings?.priority_level || "medium",
@@ -86,6 +92,33 @@ export class WebsiteSettingsService {
       };
     } catch (error) {
       console.error("Failed to get website settings:", error);
+      throw error;
+    }
+  }
+
+  async updateWebsite(
+    websiteId: string,
+    updates: { displayName: string; isActive: boolean }
+  ) {
+    console.log("websiteId", websiteId);
+    console.log("updates", updates);
+    try {
+      const { data, error } = await supabase
+        .schema("beekon_data")
+        .from("websites")
+        .update({
+          display_name: updates.displayName,
+          is_active: updates.isActive,
+        })
+        .eq("id", websiteId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error("Failed to update website:", error);
       throw error;
     }
   }

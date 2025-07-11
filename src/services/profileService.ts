@@ -1,20 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
-
-type ProfileRow = Database['beekon_data']['Tables']['profiles']['Row'];
-type ProfileInsert = Database['beekon_data']['Tables']['profiles']['Insert'];
-type ProfileUpdate = Database['beekon_data']['Tables']['profiles']['Update'];
-
-export interface UserProfile extends ProfileRow {
-  notification_settings: NotificationSettings;
-}
-
-export interface NotificationSettings {
-  email_notifications: boolean;
-  weekly_reports: boolean;
-  competitor_alerts: boolean;
-  analysis_complete: boolean;
-}
+import { 
+  Profile,
+  ProfileInsert, 
+  ProfileUpdate,
+  UserProfile,
+  NotificationSettings
+} from "@/types/database";
+import BaseService from "./baseService";
 
 export interface ProfileUpdateData {
   first_name?: string;
@@ -31,8 +23,9 @@ export interface NotificationUpdateData {
   analysis_complete?: boolean;
 }
 
-export class ProfileService {
+export class ProfileService extends BaseService {
   private static instance: ProfileService;
+  protected serviceName = 'profile' as const;
 
   public static getInstance(): ProfileService {
     if (!ProfileService.instance) {
@@ -45,8 +38,12 @@ export class ProfileService {
    * Get user profile by user ID
    */
   async getProfile(userId: string): Promise<UserProfile | null> {
-    try {
+    return this.executeOperation('getProfile', async () => {
+      this.validateUUID(userId, 'userId');
+      this.logOperation('getProfile', { userId });
+
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("profiles")
         .select("*")
         .eq("user_id", userId)
@@ -69,10 +66,7 @@ export class ProfileService {
           analysis_complete: true,
         },
       };
-    } catch (error) {
-      console.error("Failed to get profile:", error);
-      throw error;
-    }
+    });
   }
 
   /**
@@ -92,6 +86,7 @@ export class ProfileService {
       };
 
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("profiles")
         .insert({
           user_id: userId,
@@ -124,7 +119,22 @@ export class ProfileService {
     userId: string,
     updates: ProfileUpdateData
   ): Promise<UserProfile> {
-    try {
+    return this.executeOperation('updateProfile', async () => {
+      this.validateUUID(userId, 'userId');
+      this.validateRequired({ updates }, ['updates']);
+      this.logOperation('updateProfile', { userId, updates });
+
+      // Validate string fields if provided
+      if (updates.first_name !== undefined) {
+        this.validateStringLength(updates.first_name, 'first_name', 1, 100);
+      }
+      if (updates.last_name !== undefined) {
+        this.validateStringLength(updates.last_name, 'last_name', 1, 100);
+      }
+      if (updates.company !== undefined) {
+        this.validateStringLength(updates.company, 'company', 1, 200);
+      }
+
       // Update full_name if first_name or last_name changed
       const profileUpdates: ProfileUpdateData & { full_name?: string } = { ...updates };
       if (updates.first_name !== undefined || updates.last_name !== undefined) {
@@ -135,6 +145,7 @@ export class ProfileService {
       }
 
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("profiles")
         .update(profileUpdates)
         .eq("user_id", userId)
@@ -152,10 +163,7 @@ export class ProfileService {
           analysis_complete: true,
         },
       };
-    } catch (error) {
-      console.error("Failed to update profile:", error);
-      throw error;
-    }
+    });
   }
 
   /**
@@ -177,6 +185,7 @@ export class ProfileService {
       };
 
       const { data, error } = await supabase
+        .schema("beekon_data")
         .from("profiles")
         .update({ notification_settings: updatedSettings })
         .eq("user_id", userId)
@@ -201,6 +210,7 @@ export class ProfileService {
   async deleteProfile(userId: string): Promise<void> {
     try {
       const { error } = await supabase
+        .schema("beekon_data")
         .from("profiles")
         .delete()
         .eq("user_id", userId);

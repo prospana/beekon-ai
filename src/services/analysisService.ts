@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
+import { AnalysisResult, LLMResult } from "@/types/database";
 
 export type AnalysisStatus = "pending" | "running" | "completed" | "failed";
 
@@ -16,28 +17,8 @@ export interface AnalysisConfig {
   scheduleAnalysis: boolean;
 }
 
-export interface AnalysisResult {
-  id: string;
-  prompt: string;
-  website_id: string;
-  topic: string;
-  status: AnalysisStatus;
-  confidence: number;
-  created_at: string;
-  updated_at: string;
-  llm_results: LLMResult[];
-}
-
-export interface LLMResult {
-  id: string;
-  llm_provider: string;
-  is_mentioned: boolean;
-  rank_position: number | null;
-  sentiment_score: number | null;
-  response_text: string | null;
-  confidence_score: number | null;
-  analyzed_at: string;
-}
+// Re-export for backward compatibility
+export type { AnalysisResult, LLMResult };
 
 export interface AnalysisProgress {
   analysisId: string;
