@@ -14,6 +14,42 @@ export type Database = {
   };
   beekon_data: {
     Tables: {
+      api_keys: {
+        Row: {
+          created_at: string | null;
+          id: string;
+          is_active: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at: string | null;
+          name: string;
+          usage_count: number | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at?: string | null;
+          name: string;
+          usage_count?: number | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          key_hash?: string;
+          key_prefix?: string;
+          last_used_at?: string | null;
+          name?: string;
+          usage_count?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       competitors: {
         Row: {
           competitor_domain: string;
@@ -112,32 +148,97 @@ export type Database = {
           }
         ];
       };
+      profiles: {
+        Row: {
+          avatar_url: string | null;
+          company: string | null;
+          created_at: string | null;
+          email: string | null;
+          first_name: string | null;
+          full_name: string | null;
+          id: string;
+          last_name: string | null;
+          notification_settings: Json | null;
+          updated_at: string | null;
+          user_id: string;
+          workspace_id: string | null;
+        };
+        Insert: {
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id: string;
+          workspace_id?: string | null;
+        };
+        Update: {
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id?: string;
+          workspace_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profiles_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       prompts: {
         Row: {
           created_at: string | null;
           id: string;
           is_active: boolean | null;
+          opportunities: string[] | null;
           priority: number | null;
           prompt_text: string;
           prompt_type: string | null;
+          recommendation_text: string | null;
+          reporting_text: string | null;
+          strengths: string[] | null;
           topic_id: string | null;
         };
         Insert: {
           created_at?: string | null;
           id?: string;
           is_active?: boolean | null;
+          opportunities?: string[] | null;
           priority?: number | null;
           prompt_text: string;
           prompt_type?: string | null;
+          recommendation_text?: string | null;
+          reporting_text?: string | null;
+          strengths?: string[] | null;
           topic_id?: string | null;
         };
         Update: {
           created_at?: string | null;
           id?: string;
           is_active?: boolean | null;
+          opportunities?: string[] | null;
           priority?: number | null;
           prompt_text?: string;
           prompt_type?: string | null;
+          recommendation_text?: string | null;
+          reporting_text?: string | null;
+          strengths?: string[] | null;
           topic_id?: string | null;
         };
         Relationships: [
@@ -189,6 +290,38 @@ export type Database = {
             foreignKeyName: "topics_website_id_fkey";
             columns: ["website_id"];
             isOneToOne: false;
+            referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      website_settings: {
+        Row: {
+          created_at: string | null;
+          id: string;
+          settings: Json;
+          updated_at: string | null;
+          website_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          id?: string;
+          settings?: Json;
+          updated_at?: string | null;
+          website_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          id?: string;
+          settings?: Json;
+          updated_at?: string | null;
+          website_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "website_settings_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: true;
             referencedRelation: "websites";
             referencedColumns: ["id"];
           }
@@ -272,7 +405,15 @@ export type Database = {
           subscription_tier?: string | null;
           updated_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["user_id"];
+          }
+        ];
       };
     };
     Views: {

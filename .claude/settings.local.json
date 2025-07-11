@@ -10,7 +10,12 @@
       "Bash(npm cache clean:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run type-check:*)",
-      "Bash(npm run validate:*)"
+      "Bash(npm run validate:*)",
+      "Bash(rg:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(npx supabase link:*)",
+      "Bash(npx supabase:*)"
     ],
     "deny": []
   }

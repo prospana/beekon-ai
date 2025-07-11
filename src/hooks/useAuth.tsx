@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Session, User } from "@supabase/supabase-js";
+import { Session, User, AuthError } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useState } from "react";
 
 interface AuthContextType {
@@ -7,8 +7,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   workspaceId: string | null;
-  signUp: (email: string, password: string) => Promise<{ error: unknown }>;
-  signIn: (email: string, password: string) => Promise<{ error: unknown }>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
+  // Separate effect for auth state
   useEffect(() => {
     // Set up auth state listener
     const {
@@ -37,26 +38,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    if (user?.id) {
-      supabase
-        .schema("beekon_data")
-        .from("workspaces")
-        .select(`id`)
-        .eq("owner_id", user.id)
-        .limit(1)
-        .single()
-        .then((res) => {
-          if (res.data) {
-            setWorkspaceId(res.data.id);
-          } else {
-            setWorkspaceId(null);
-          }
-        });
-    } else {
-      setWorkspaceId(null);
-    }
-
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Separate effect for workspace fetching
+  useEffect(() => {
+    const fetchWorkspace = async () => {
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .schema("beekon_data")
+            .from("workspaces")
+            .select(`id`)
+            .eq("owner_id", user.id)
+            .limit(1)
+            .single();
+
+          if (error && error.code !== "PGRST116") {
+            console.error("Error fetching workspace:", error);
+          }
+
+          setWorkspaceId(data?.id || null);
+        } catch (error) {
+          console.error("Error fetching workspace:", error);
+          setWorkspaceId(null);
+        }
+      } else {
+        setWorkspaceId(null);
+      }
+    };
+
+    fetchWorkspace();
   }, [user?.id]);
 
   const signUp = async (email: string, password: string) => {

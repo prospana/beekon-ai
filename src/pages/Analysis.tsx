@@ -1,13 +1,22 @@
-import { useState, useEffect, useCallback } from "react";
+import { AnalysisConfigModal } from "@/components/AnalysisConfigModal";
+import { AnalysisErrorBoundary } from "@/components/AnalysisErrorBoundary";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  AnalysisFilterSkeleton,
+  AnalysisListSkeleton,
+  AnalysisStatsSkeleton,
+} from "@/components/AnalysisLoadingSkeleton";
+import {
+  AnalysisVisualization,
+  RankingChart,
+  SentimentChart,
+} from "@/components/AnalysisVisualization";
+import { ContextualEmptyState } from "@/components/ContextualEmptyState";
+import { DetailedAnalysisModal } from "@/components/DetailedAnalysisModal";
+import { FilterBreadcrumbs } from "@/components/FilterBreadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Select,
@@ -16,57 +25,59 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { AnalysisConfigModal } from "@/components/AnalysisConfigModal";
-import { DetailedAnalysisModal } from "@/components/DetailedAnalysisModal";
 import { WorkspaceModal } from "@/components/WorkspaceModal";
-import { AnalysisErrorBoundary } from "@/components/AnalysisErrorBoundary";
-import { useAnalysisErrorHandler } from "@/hooks/useAnalysisError";
-import { 
-  AnalysisListSkeleton, 
-  AnalysisFilterSkeleton, 
-  AnalysisStatsSkeleton 
-} from "@/components/AnalysisLoadingSkeleton";
-import { AnalysisVisualization, SentimentChart, RankingChart } from "@/components/AnalysisVisualization";
 import { useToast } from "@/hooks/use-toast";
+import { useAnalysisErrorHandler } from "@/hooks/useAnalysisError";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { analysisService, type AnalysisResult } from "@/services/analysisService";
-import { Search, Check, X, ExternalLink, Plus, Filter, Building, Calendar, TrendingUp, TrendingDown, AlertCircle, RefreshCw, BarChart3, Eye, EyeOff } from "lucide-react";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { analysisService, LLMResult } from "@/services/analysisService";
+import { UIAnalysisResult } from "@/types/database";
+import {
+  AlertCircle,
+  Building,
+  Calendar,
+  Check,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Filter,
+  Plus,
+  RefreshCw,
+  Search,
+  TrendingDown,
+  TrendingUp,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
-interface LLMData {
-  mentioned: boolean;
-  rank: number | null;
-  sentiment: string | null;
-  response?: string;
-}
-
-interface LegacyAnalysisResult {
-  id: string;
-  prompt: string;
-  chatgpt: LLMData;
-  claude: LLMData;
-  gemini: LLMData;
-  topic: string;
-  timestamp: string;
-  confidence: number;
-}
+// LegacyAnalysisResult interface removed - now using modern AnalysisResult directly
 
 export default function Analysis() {
   const { toast } = useToast();
   const { currentWorkspace, loading, websites } = useWorkspace();
-  const { enforceLimit, getRemainingCredits, getSubscriptionTier } = useSubscriptionEnforcement();
-  const { error, isRetrying, handleError, retryOperation, clearError } = useAnalysisErrorHandler();
+  const { enforceLimit, getRemainingCredits } = useSubscriptionEnforcement();
+  const { error, isRetrying, handleError, retryOperation, clearError } =
+    useAnalysisErrorHandler();
   const [selectedTopic, setSelectedTopic] = useState("all");
   const [selectedLLM, setSelectedLLM] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedResult, setSelectedResult] = useState<LegacyAnalysisResult | null>(null);
+  const [selectedResult, setSelectedResult] = useState<UIAnalysisResult | null>(
+    null
+  );
   const [isFiltering, setIsFiltering] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
-  const [topics, setTopics] = useState<Array<{ id: string; name: string }>>([]);
+  const [analysisResults, setAnalysisResults] = useState<UIAnalysisResult[]>(
+    []
+  );
+  const [topics, setTopics] = useState<
+    Array<{ id: string; name: string; resultCount: number }>
+  >([]);
+  const [availableLLMs, setAvailableLLMs] = useState<
+    Array<{ id: string; name: string; resultCount: number }>
+  >([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [selectedWebsite, setSelectedWebsite] = useState<string>("");
   const [showVisualization, setShowVisualization] = useState(true);
@@ -74,24 +85,38 @@ export default function Analysis() {
   // Set selected website to first website when websites load
   useEffect(() => {
     if (websites && websites.length > 0 && !selectedWebsite) {
-      setSelectedWebsite(websites[0].id);
+      setSelectedWebsite(websites[0]!.id);
     }
   }, [websites, selectedWebsite]);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Load analysis results
   const loadAnalysisResults = useCallback(async () => {
     if (!selectedWebsite) return;
-    
+
     setIsLoadingResults(true);
     clearError();
-    
+
     try {
       const filters = {
         topic: selectedTopic !== "all" ? selectedTopic : undefined,
         llmProvider: selectedLLM !== "all" ? selectedLLM : undefined,
+        searchQuery: debouncedSearchQuery.trim() || undefined,
       };
-      
-      const results = await analysisService.getAnalysisResults(selectedWebsite, filters);
+
+      const results = await analysisService.getAnalysisResults(
+        selectedWebsite,
+        filters
+      );
+
       setAnalysisResults(results);
     } catch (error) {
       console.error("Failed to load analysis results:", error);
@@ -104,17 +129,62 @@ export default function Analysis() {
     } finally {
       setIsLoadingResults(false);
     }
-  }, [selectedWebsite, selectedTopic, selectedLLM, toast, handleError, clearError]);
+  }, [
+    selectedWebsite,
+    selectedTopic,
+    selectedLLM,
+    debouncedSearchQuery,
+    toast,
+    handleError,
+    clearError,
+  ]);
 
   // Load topics for the selected website
   const loadTopics = useCallback(async () => {
     if (!selectedWebsite) return;
-    
+
     try {
-      const websiteTopics = await analysisService.getTopicsForWebsite(selectedWebsite);
-      setTopics([{ id: "all", name: "All Topics" }, ...websiteTopics]);
+      const websiteTopics = await analysisService.getTopicsForWebsite(
+        selectedWebsite
+      );
+      setTopics([
+        {
+          id: "all",
+          name: "All Topics",
+          resultCount: websiteTopics.reduce(
+            (sum, topic) => sum + topic.resultCount,
+            0
+          ),
+        },
+        ...websiteTopics,
+      ]);
     } catch (error) {
       console.error("Failed to load topics:", error);
+      handleError(error);
+    }
+  }, [selectedWebsite, handleError]);
+
+  // Load available LLMs for the selected website
+  const loadAvailableLLMs = useCallback(async () => {
+    if (!selectedWebsite) return;
+
+    try {
+      const llmProviders = await analysisService.getAvailableLLMProviders(
+        selectedWebsite
+      );
+      setAvailableLLMs([
+        {
+          id: "all",
+          name: "All LLMs",
+          resultCount: llmProviders.reduce(
+            (sum, llm) => sum + llm.resultCount,
+            0
+          ),
+        },
+        ...llmProviders,
+      ]);
+    } catch (error) {
+      console.error("Failed to load LLM providers:", error);
       handleError(error);
     }
   }, [selectedWebsite, handleError]);
@@ -124,74 +194,43 @@ export default function Analysis() {
     loadAnalysisResults();
   }, [loadAnalysisResults]);
 
+  // Filter validation - reset invalid filters when data changes
+  useEffect(() => {
+    if (topics.length > 0 && selectedTopic !== "all") {
+      const topicExists = topics.some((topic) => topic.id === selectedTopic);
+      if (!topicExists) {
+        setSelectedTopic("all");
+      }
+    }
+  }, [topics, selectedTopic]);
+
+  useEffect(() => {
+    if (availableLLMs.length > 0 && selectedLLM !== "all") {
+      const llmExists = availableLLMs.some((llm) => llm.id === selectedLLM);
+      if (!llmExists) {
+        setSelectedLLM("all");
+      }
+    }
+  }, [availableLLMs, selectedLLM]);
+
   useEffect(() => {
     loadTopics();
-  }, [loadTopics]);
+    loadAvailableLLMs();
+  }, [loadTopics, loadAvailableLLMs]);
 
-  // Transform analysis results to legacy format for existing components
-  const transformToLegacyFormat = (results: AnalysisResult[]): LegacyAnalysisResult[] => {
-    return results.map(result => {
-      const chatgptResult = result.llm_results.find(r => r.llm_provider === "chatgpt");
-      const claudeResult = result.llm_results.find(r => r.llm_provider === "claude");
-      const geminiResult = result.llm_results.find(r => r.llm_provider === "gemini");
-      
-      const getSentiment = (score: number | null): string | null => {
-        if (score === null) return null;
-        if (score > 0.1) return "positive";
-        if (score < -0.1) return "negative";
-        return "neutral";
-      };
+  // No need for legacy format transformation - work directly with modern format
+  const filteredResults = analysisResults;
 
-      return {
-        id: result.id,
-        prompt: result.prompt,
-        chatgpt: {
-          mentioned: chatgptResult?.is_mentioned || false,
-          rank: chatgptResult?.rank_position || null,
-          sentiment: getSentiment(chatgptResult?.sentiment_score || null),
-          response: chatgptResult?.response_text || undefined,
-        },
-        claude: {
-          mentioned: claudeResult?.is_mentioned || false,
-          rank: claudeResult?.rank_position || null,
-          sentiment: getSentiment(claudeResult?.sentiment_score || null),
-          response: claudeResult?.response_text || undefined,
-        },
-        gemini: {
-          mentioned: geminiResult?.is_mentioned || false,
-          rank: geminiResult?.rank_position || null,
-          sentiment: getSentiment(geminiResult?.sentiment_score || null),
-          response: geminiResult?.response_text || undefined,
-        },
-        topic: result.topic,
-        timestamp: result.created_at,
-        confidence: result.confidence,
-      };
-    });
-  };
-
-  const legacyAnalysisResults = transformToLegacyFormat(analysisResults);
-
-  // Filter results based on search query
-  const filteredResults = legacyAnalysisResults.filter(result => {
-    if (!searchQuery.trim()) return true;
-    
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      result.prompt.toLowerCase().includes(searchLower) ||
-      result.topic.toLowerCase().includes(searchLower) ||
-      result.chatgpt.response?.toLowerCase().includes(searchLower) ||
-      result.claude.response?.toLowerCase().includes(searchLower) ||
-      result.gemini.response?.toLowerCase().includes(searchLower)
-    );
-  });
-
-  const llmFilters = [
-    { id: "all", name: "All LLMs" },
-    { id: "chatgpt", name: "ChatGPT" },
-    { id: "claude", name: "Claude" },
-    { id: "gemini", name: "Gemini" },
-  ];
+  // Use dynamic LLM filters from server data
+  const llmFilters =
+    availableLLMs.length > 0
+      ? availableLLMs
+      : [
+          { id: "all", name: "All LLMs", resultCount: 0 },
+          { id: "chatgpt", name: "ChatGPT", resultCount: 0 },
+          { id: "claude", name: "Claude", resultCount: 0 },
+          { id: "gemini", name: "Gemini", resultCount: 0 },
+        ];
 
   const getSentimentColor = (sentiment: string | null) => {
     if (!sentiment) return "";
@@ -216,6 +255,25 @@ export default function Analysis() {
     return <Badge className={`${className} text-white`}>{sentiment}</Badge>;
   };
 
+  const getSentimentBadgeFromScore = (score: number | null) => {
+    if (score === null) return null;
+    let sentiment: string;
+    let className: string;
+
+    if (score > 0.1) {
+      sentiment = "positive";
+      className = "bg-success";
+    } else if (score < -0.1) {
+      sentiment = "negative";
+      className = "bg-destructive";
+    } else {
+      sentiment = "neutral";
+      className = "bg-warning";
+    }
+
+    return <Badge className={`${className} text-white`}>{sentiment}</Badge>;
+  };
+
   const handleFilterChange = async (filterType: string, value: string) => {
     setIsFiltering(true);
     try {
@@ -236,25 +294,58 @@ export default function Analysis() {
     }
   };
 
-  const handleViewDetails = (result: LegacyAnalysisResult) => {
+  const handleViewDetails = (result: UIAnalysisResult) => {
     setSelectedResult(result);
     setIsDetailModalOpen(true);
   };
 
+  // getSentimentFromScore function removed - now handled in DetailedAnalysisModal
+
+  const handleClearFilters = () => {
+    setSelectedTopic("all");
+    setSelectedLLM("all");
+    setSearchQuery("");
+  };
+
+  const handleRemoveFilter = (filterType: "topic" | "llm" | "search") => {
+    switch (filterType) {
+      case "topic":
+        setSelectedTopic("all");
+        break;
+      case "llm":
+        setSelectedLLM("all");
+        break;
+      case "search":
+        setSearchQuery("");
+        break;
+    }
+  };
+
+  const hasActiveFilters =
+    selectedTopic !== "all" ||
+    selectedLLM !== "all" ||
+    searchQuery.trim() !== "";
+
+  const createAnalysis = () => {
+    if (enforceLimit("websiteAnalyses", "New Analysis")) {
+      setIsConfigModalOpen(true);
+    }
+  };
+
   const MentionIndicator = ({
-    llmData,
+    llmResult,
     llmName,
   }: {
-    llmData: LLMData;
+    llmResult: LLMResult | undefined;
     llmName: string;
   }) => (
     <div className="text-center">
       <div className="text-xs text-muted-foreground mb-1">{llmName}</div>
-      {llmData.mentioned ? (
+      {llmResult?.is_mentioned ? (
         <div className="space-y-1">
           <Check className="h-5 w-5 text-success mx-auto" />
-          <div className="text-xs font-medium">#{llmData.rank}</div>
-          {getSentimentBadge(llmData.sentiment)}
+          <div className="text-xs font-medium">#{llmResult.rank_position}</div>
+          {getSentimentBadgeFromScore(llmResult.sentiment_score)}
         </div>
       ) : (
         <X className="h-5 w-5 text-muted-foreground mx-auto" />
@@ -302,7 +393,9 @@ export default function Analysis() {
             <Building className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-2">Workspace Required</h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              To run and view analysis results, you need to create a workspace first. Your workspace will track your usage and manage your analysis credits.
+              To run and view analysis results, you need to create a workspace
+              first. Your workspace will track your usage and manage your
+              analysis credits.
             </p>
             <LoadingButton
               onClick={() => setShowCreateWorkspace(true)}
@@ -332,269 +425,316 @@ export default function Analysis() {
             </p>
           </div>
 
-        {/* Error State */}
-        {error && (
-          <Card className="border-destructive/50 bg-destructive/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <AlertCircle className="h-5 w-5 text-destructive" />
-                <h3 className="font-semibold text-destructive">Error Loading Analysis Data</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                {error.message || "An unexpected error occurred while loading your analysis data."}
-              </p>
-              <div className="flex space-x-2">
-                <LoadingButton
-                  onClick={() => retryOperation(loadAnalysisResults)}
-                  loading={isRetrying}
-                  variant="outline"
-                  size="sm"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Retry
-                </LoadingButton>
-                <Button
-                  onClick={clearError}
-                  variant="outline"
-                  size="sm"
-                >
-                  Dismiss
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Filters and Search */}
-        {loading ? (
-          <AnalysisFilterSkeleton />
-        ) : (
-          <div className="space-y-4">
-            {/* Website Selection */}
-            {websites && websites.length > 1 && (
-              <div className="flex items-center space-x-2">
-                <Building className="h-4 w-4 text-muted-foreground" />
-                <Select
-                  value={selectedWebsite}
-                  onValueChange={setSelectedWebsite}
-                  disabled={isLoadingResults}
-                >
-                  <SelectTrigger className="w-[250px]">
-                    <SelectValue placeholder="Select website" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {websites.map((website) => (
-                      <SelectItem key={website.id} value={website.id}>
-                        {website.display_name || website.domain}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Search and Filters */}
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-4">
-                {/* Search Input */}
-                <div className="flex items-center space-x-2">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search analysis results..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-[300px]"
-                    disabled={isLoadingResults}
-                  />
+          {/* Error State */}
+          {error && (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                  <h3 className="font-semibold text-destructive">
+                    Error Loading Analysis Data
+                  </h3>
                 </div>
-
-                {/* Topic Filter */}
-                <div className="flex items-center space-x-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <Select
-                    value={selectedTopic}
-                    onValueChange={(value) => handleFilterChange("topic", value)}
-                    disabled={isFiltering || isLoadingResults}
+                <p className="text-sm text-muted-foreground mb-4">
+                  {error.message ||
+                    "An unexpected error occurred while loading your analysis data."}
+                </p>
+                <div className="flex gap-3">
+                  <LoadingButton
+                    onClick={() => retryOperation(loadAnalysisResults)}
+                    loading={isRetrying}
+                    variant="outline"
+                    size="sm"
                   >
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Select topic" />
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </LoadingButton>
+                  <Button onClick={clearError} variant="outline" size="sm">
+                    Dismiss
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Filters and Search */}
+          {loading ? (
+            <AnalysisFilterSkeleton />
+          ) : (
+            <div className="space-y-4">
+              {/* Website Selection */}
+              {websites && websites.length > 1 && (
+                <div className="flex items-center space-x-2">
+                  <Building className="h-4 w-4 text-muted-foreground" />
+                  <Select
+                    value={selectedWebsite}
+                    onValueChange={setSelectedWebsite}
+                    disabled={isLoadingResults}
+                  >
+                    <SelectTrigger className="w-[250px]">
+                      <SelectValue placeholder="Select website" />
                     </SelectTrigger>
                     <SelectContent>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic.id} value={topic.id}>
-                          {topic.name}
+                      {websites.map((website) => (
+                        <SelectItem key={website.id} value={website.id}>
+                          {website.display_name || website.domain}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* LLM Filter Buttons */}
-                <div className="flex space-x-2">
-                  {llmFilters.map((filter) => (
-                    <LoadingButton
-                      key={filter.id}
-                      variant={selectedLLM === filter.id ? "default" : "outline"}
-                      size="sm"
-                      loading={isFiltering && selectedLLM !== filter.id}
-                      onClick={() => handleFilterChange("llm", filter.id)}
-                      disabled={isLoadingResults}
-                    >
-                      {filter.name}
-                    </LoadingButton>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowVisualization(!showVisualization)}
-                >
-                  {showVisualization ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  {showVisualization ? "Hide" : "Show"} Analytics
-                </Button>
-                
-                <LoadingButton
-                  onClick={() => {
-                    if (enforceLimit("websiteAnalyses", "New Analysis")) {
-                      setIsConfigModalOpen(true);
-                    }
-                  }}
-                  icon={<Plus className="h-4 w-4" />}
-                  disabled={!selectedWebsite || isLoadingResults}
-                >
-                  New Analysis
-                  {currentWorkspace && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {getRemainingCredits()} left
-                    </Badge>
-                  )}
-                </LoadingButton>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Analysis Visualization */}
-        {!loading && !isLoadingResults && showVisualization && filteredResults.length > 0 && (
-          <AnalysisVisualization results={filteredResults} />
-        )}
-
-        {/* Additional Charts */}
-        {!loading && !isLoadingResults && showVisualization && filteredResults.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <SentimentChart results={filteredResults} />
-            <RankingChart results={filteredResults} />
-          </div>
-        )}
-
-        {/* Results */}
-        <div className="space-y-4">
-          {isLoadingResults ? (
-            <AnalysisListSkeleton />
-          ) : (
-            filteredResults.map((result) => (
-              <Card key={result.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-2">
-                        {result.prompt}
-                      </CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline">{result.topic}</Badge>
-                        <Badge variant="outline" className="text-xs">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {new Date(result.timestamp).toLocaleDateString()}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          Confidence: {result.confidence}%
-                        </Badge>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewDetails(result)}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-8">
-                    <MentionIndicator
-                      llmData={result.chatgpt}
-                      llmName="ChatGPT"
-                    />
-                    <MentionIndicator llmData={result.claude} llmName="Claude" />
-                    <MentionIndicator llmData={result.gemini} llmName="Gemini" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-
-        {/* Empty State */}
-        {!isLoadingResults && filteredResults.length === 0 && (
-          <Card className="text-center py-12">
-            <CardContent>
-              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <CardTitle className="mb-2">
-                {analysisResults.length === 0 ? "No analysis results found" : "No results match your search"}
-              </CardTitle>
-              <CardDescription className="mb-4">
-                {analysisResults.length === 0 
-                  ? "Get started by running your first analysis to see how your brand is mentioned across AI platforms" 
-                  : "Try adjusting your search terms or filters to find more results"}
-              </CardDescription>
-              {analysisResults.length === 0 && (
-                <LoadingButton
-                  onClick={() => {
-                    if (enforceLimit("websiteAnalyses", "New Analysis")) {
-                      setIsConfigModalOpen(true);
-                    }
-                  }}
-                  icon={<Plus className="h-4 w-4" />}
-                  disabled={!selectedWebsite}
-                >
-                  Run New Analysis
-                </LoadingButton>
               )}
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Results Stats */}
-        {isLoadingResults ? (
-          <AnalysisStatsSkeleton />
-        ) : (
-          filteredResults.length > 0 && (
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Showing {filteredResults.length} of {analysisResults.length} results
-                {searchQuery && ` for "${searchQuery}"`}
-              </span>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-1">
-                  <TrendingUp className="h-4 w-4 text-success" />
-                  <span>
-                    {filteredResults.filter(r => r.chatgpt.mentioned || r.claude.mentioned || r.gemini.mentioned).length} mentions
-                  </span>
+              {/* Search and Filters */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex gap-3">
+                  {/* Search Input */}
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search analysis results..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full sm:w-[300px]"
+                      disabled={isLoadingResults}
+                    />
+                  </div>
+
+                  {/* Topic Filter */}
+                  <div className="flex items-center space-x-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <Select
+                      value={selectedTopic}
+                      onValueChange={(value) =>
+                        handleFilterChange("topic", value)
+                      }
+                      disabled={isFiltering || isLoadingResults}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select topic" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {topics.map((topic) => (
+                          <SelectItem key={topic.id} value={topic.id}>
+                            <div className="flex justify-between items-center w-full">
+                              <span>{topic.name}</span>
+                              <Badge variant="outline" className="ml-2 text-xs">
+                                {topic.resultCount}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* LLM Filter Buttons */}
+                  <div className="flex gap-3">
+                    {llmFilters.map((filter) => (
+                      <LoadingButton
+                        key={filter.id}
+                        variant={
+                          selectedLLM === filter.id ? "default" : "outline"
+                        }
+                        size="sm"
+                        loading={isFiltering && selectedLLM !== filter.id}
+                        onClick={() => handleFilterChange("llm", filter.id)}
+                        disabled={isLoadingResults || filter.resultCount === 0}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{filter.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {filter.resultCount}
+                          </Badge>
+                        </div>
+                      </LoadingButton>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {filteredResults.filter(r => !r.chatgpt.mentioned && !r.claude.mentioned && !r.gemini.mentioned).length} no mentions
-                  </span>
+
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowVisualization(!showVisualization)}
+                  >
+                    {showVisualization ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    {showVisualization ? "Hide" : "Show"} Analytics
+                  </Button>
+
+                  <LoadingButton
+                    onClick={() => {
+                      if (enforceLimit("websiteAnalyses", "New Analysis")) {
+                        setIsConfigModalOpen(true);
+                      }
+                    }}
+                    icon={<Plus className="h-4 w-4" />}
+                    disabled={!selectedWebsite || isLoadingResults}
+                  >
+                    New Analysis
+                    {currentWorkspace && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        <span className="text-background">
+                          {getRemainingCredits()} left
+                        </span>
+                      </Badge>
+                    )}
+                  </LoadingButton>
                 </div>
               </div>
             </div>
-          )
-        )}
+          )}
+
+          {/* Filter Breadcrumbs */}
+          {!loading && !isLoadingResults && hasActiveFilters && (
+            <FilterBreadcrumbs
+              filters={{
+                topic: selectedTopic !== "all" ? selectedTopic : undefined,
+                llm: selectedLLM !== "all" ? selectedLLM : undefined,
+                search: searchQuery.trim() || undefined,
+              }}
+              onRemoveFilter={handleRemoveFilter}
+              onClearAll={handleClearFilters}
+              resultCount={filteredResults.length}
+            />
+          )}
+
+          {/* Analysis Visualization */}
+          {!loading &&
+            !isLoadingResults &&
+            showVisualization &&
+            filteredResults.length > 0 && (
+              <AnalysisVisualization results={filteredResults} />
+            )}
+
+          {/* Additional Charts */}
+          {!loading &&
+            !isLoadingResults &&
+            showVisualization &&
+            filteredResults.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <SentimentChart results={filteredResults} />
+                <RankingChart results={filteredResults} />
+              </div>
+            )}
+
+          {/* Results */}
+          <div className="space-y-4">
+            {isLoadingResults ? (
+              <AnalysisListSkeleton />
+            ) : (
+              filteredResults.map((result) => (
+                <Card key={result.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 flex flex-col gap-3">
+                        <CardTitle>{result.prompt}</CardTitle>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">{result.topic}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(result.created_at).toLocaleDateString()}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            Confidence:{" "}
+                            {parseFloat(result.confidence.toFixed(2)) * 100}%
+                          </Badge>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewDetails(result)}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-8">
+                      <MentionIndicator
+                        llmResult={result.llm_results.find(
+                          (r) => r.llm_provider === "chatgpt"
+                        )}
+                        llmName="ChatGPT"
+                      />
+                      <MentionIndicator
+                        llmResult={result.llm_results.find(
+                          (r) => r.llm_provider === "claude"
+                        )}
+                        llmName="Claude"
+                      />
+                      <MentionIndicator
+                        llmResult={result.llm_results.find(
+                          (r) => r.llm_provider === "gemini"
+                        )}
+                        llmName="Gemini"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          {/* Empty State */}
+          {!isLoadingResults && filteredResults.length === 0 && (
+            <ContextualEmptyState
+              hasData={analysisResults.length > 0}
+              hasFilters={hasActiveFilters}
+              activeFilters={{
+                topic: selectedTopic !== "all" ? selectedTopic : undefined,
+                llm: selectedLLM !== "all" ? selectedLLM : undefined,
+                search: searchQuery.trim() || undefined,
+              }}
+              onClearFilters={handleClearFilters}
+              onCreateAnalysis={createAnalysis}
+              isCreatingAnalysis={isLoadingResults}
+            />
+          )}
+
+          {/* Results Stats */}
+          {isLoadingResults ? (
+            <AnalysisStatsSkeleton />
+          ) : (
+            filteredResults.length > 0 && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Showing {filteredResults.length} of {analysisResults.length}{" "}
+                  results
+                  {searchQuery && ` for "${searchQuery}"`}
+                </span>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <TrendingUp className="h-4 w-4 text-success" />
+                    <span>
+                      {
+                        filteredResults.filter((r) =>
+                          r.llm_results.some((llm) => llm.is_mentioned)
+                        ).length
+                      }{" "}
+                      mentions
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                    <span>
+                      {
+                        filteredResults.filter(
+                          (r) => !r.llm_results.some((llm) => llm.is_mentioned)
+                        ).length
+                      }{" "}
+                      no mentions
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )
+          )}
         </div>
 
         <AnalysisConfigModal

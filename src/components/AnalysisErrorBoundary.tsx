@@ -86,7 +86,7 @@ export class AnalysisErrorBoundary extends React.Component<
               </p>
             </div>
             
-            <div className="flex space-x-2">
+            <div className="flex gap-3">
               <Button
                 onClick={this.resetError}
                 variant="outline"

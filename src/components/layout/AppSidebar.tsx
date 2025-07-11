@@ -1,15 +1,15 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { BarChart3, Globe, Search, Users, Settings, Zap } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
 } from "@/components/ui/sidebar";
+import { BarChart3, Globe, Search, Settings, Users } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -25,11 +25,8 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-6">
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
-            <Zap className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <h1 className="text-xl font-bold text-primary">Beekon.ai</h1>
+        <div className="flex items-center space-x-2 max-h-5">
+          <img src="/beekon-transparent-cropped.png" alt="" />
         </div>
       </SidebarHeader>
 

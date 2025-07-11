@@ -1,4 +1,12 @@
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -6,47 +14,43 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { Separator } from "@/components/ui/separator";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { analysisService } from "@/services/analysisService";
+import { InsightService } from "@/services/insightService";
 import {
-  ExternalLink,
-  Download,
-  ThumbsUp,
-  ThumbsDown,
-  Minus,
-  TrendingUp,
-  TrendingDown,
-  Copy,
-  Share,
   BarChart3,
-  FileText,
-  Table,
-  Code,
   ChevronDown,
+  Code,
+  Copy,
+  Download,
+  FileText,
+  Lightbulb,
+  Minus,
+  Share,
+  Table,
+  Target,
+  ThumbsDown,
+  ThumbsUp,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
-
-interface AnalysisResult {
-  id: string;
-  prompt: string;
-  chatgpt: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
-  claude: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
-  gemini: { mentioned: boolean; rank: number | null; sentiment: string | null; response?: string };
-  topic: string;
-  timestamp: string;
-  confidence: number;
-}
+import { useState, useMemo } from "react";
+import { UIAnalysisResult, UILLMResult } from "@/types/database";
 
 interface DetailedAnalysisModalProps {
   isOpen: boolean;
   onClose: () => void;
-  analysisResult: AnalysisResult | null;
+  analysisResult: UIAnalysisResult | null;
 }
 
 export function DetailedAnalysisModal({
@@ -59,25 +63,88 @@ export function DetailedAnalysisModal({
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Generate insights dynamically
+  const insights = useMemo(() => {
+    if (!analysisResult) {
+      return {
+        strengths: [],
+        opportunities: [],
+        recommendations: [],
+        summary: 'No analysis data available',
+        generatedAt: new Date().toISOString()
+      };
+    }
+    
+    try {
+      // Validate that llm_results exists and is an array
+      if (!analysisResult.llm_results || !Array.isArray(analysisResult.llm_results)) {
+        return {
+          strengths: [],
+          opportunities: [],
+          recommendations: ['Unable to generate insights - invalid analysis data'],
+          summary: 'Analysis data is incomplete or corrupted',
+          generatedAt: new Date().toISOString()
+        };
+      }
+
+      // Convert UI format to AnalysisResult format for InsightService
+      const analysisResultForInsights = {
+        topic_name: analysisResult.topic || 'Unknown Topic',
+        topic_keywords: [analysisResult.topic || 'Unknown Topic'], // Fallback since we don't have keywords in UI format
+        llm_results: analysisResult.llm_results.map(llm => ({
+          llm_provider: llm.llm_provider || 'unknown',
+          is_mentioned: Boolean(llm.is_mentioned),
+          rank_position: llm.rank_position,
+          confidence_score: llm.confidence_score,
+          sentiment_score: llm.sentiment_score,
+          summary_text: llm.summary_text,
+          response_text: llm.response_text,
+          analyzed_at: llm.analyzed_at || new Date().toISOString()
+        })),
+        total_mentions: analysisResult.llm_results.filter(llm => llm.is_mentioned).length,
+        avg_rank: analysisResult.llm_results.length > 0 ? 
+          analysisResult.llm_results.reduce((sum, llm) => sum + (llm.rank_position || 0), 0) / analysisResult.llm_results.length : null,
+        avg_confidence: analysisResult.llm_results.length > 0 ? 
+          analysisResult.llm_results.reduce((sum, llm) => sum + (llm.confidence_score || 0), 0) / analysisResult.llm_results.length : null,
+        avg_sentiment: analysisResult.llm_results.length > 0 ? 
+          analysisResult.llm_results.reduce((sum, llm) => sum + (llm.sentiment_score || 0), 0) / analysisResult.llm_results.length : null,
+      };
+      
+      return InsightService.generateInsights([analysisResultForInsights]);
+    } catch (error) {
+      console.error('Error generating insights:', error);
+      return {
+        strengths: [],
+        opportunities: [],
+        recommendations: ['Unable to generate insights due to an error'],
+        summary: 'Error occurred while analyzing the data',
+        generatedAt: new Date().toISOString()
+      };
+    }
+  }, [analysisResult]);
+
   if (!analysisResult) return null;
 
   const handleExport = async (format: "pdf" | "csv" | "json") => {
-    if (!analysisResult) return;
-    
+    if (!analysisResult?.id) return;
+
     setIsExporting(true);
     try {
-      const blob = await analysisService.exportAnalysisResults([analysisResult.id], format);
-      
+      const blob = await analysisService.exportAnalysisResults(
+        [analysisResult.id],
+        format
+      );
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `analysis-${analysisResult.id}-${Date.now()}.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: "Export successful",
         description: `Analysis data exported as ${format.toUpperCase()}`,
@@ -94,12 +161,15 @@ export function DetailedAnalysisModal({
     }
   };
 
-  const handleSaveFeedback = async (llm: string, feedback: "positive" | "negative") => {
+  const handleSaveFeedback = async (
+    llm: string,
+    feedback: "positive" | "negative"
+  ) => {
     setIsSaving(true);
     try {
       // Simulate saving feedback
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       toast({
         title: "Feedback saved",
         description: `Your feedback for ${llm} has been recorded.`,
@@ -145,17 +215,47 @@ export function DetailedAnalysisModal({
     }
   };
 
-  const llmResults = [
-    { name: "ChatGPT", data: analysisResult.chatgpt, color: "bg-green-500" },
-    { name: "Claude", data: analysisResult.claude, color: "bg-orange-500" },
-    { name: "Gemini", data: analysisResult.gemini, color: "bg-blue-500" },
-  ];
-
-  const mockResponses = {
-    chatgpt: "Based on my analysis, this company offers innovative AI-powered solutions for business automation. Their platform integrates well with existing workflows and provides comprehensive analytics. I'd recommend them for medium to large enterprises looking for scalable automation tools.",
-    claude: "This organization provides sophisticated artificial intelligence tools designed for business process optimization. Their approach combines machine learning with user-friendly interfaces. The solution appears well-suited for companies seeking to enhance operational efficiency through intelligent automation.",
-    gemini: "The company specializes in AI-driven business solutions with a focus on automation and analytics. Their technology stack includes advanced machine learning capabilities and robust integration options. They seem to target enterprise clients looking for comprehensive AI implementation.",
+  // Helper function to get sentiment string from score
+  const getSentimentFromScore = (score: number | null): string => {
+    if (score === null) return "neutral";
+    if (score > 0.1) return "positive";
+    if (score < -0.1) return "negative";
+    return "neutral";
   };
+
+  // Convert modern format to UI format for easier display
+  const llmResults = [
+    {
+      name: "ChatGPT",
+      data: {
+        mentioned: analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.is_mentioned || false,
+        rank: analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.rank_position || null,
+        sentiment: getSentimentFromScore(analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.sentiment_score || null),
+        response: analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.response_text || null,
+      },
+      color: "bg-green-500"
+    },
+    {
+      name: "Claude",
+      data: {
+        mentioned: analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.is_mentioned || false,
+        rank: analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.rank_position || null,
+        sentiment: getSentimentFromScore(analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.sentiment_score || null),
+        response: analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.response_text || null,
+      },
+      color: "bg-orange-500"
+    },
+    {
+      name: "Gemini",
+      data: {
+        mentioned: analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.is_mentioned || false,
+        rank: analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.rank_position || null,
+        sentiment: getSentimentFromScore(analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.sentiment_score || null),
+        response: analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.response_text || null,
+      },
+      color: "bg-blue-500"
+    },
+  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -166,7 +266,7 @@ export function DetailedAnalysisModal({
               <BarChart3 className="h-5 w-5" />
               <span>Detailed Analysis Results</span>
             </div>
-            <div className="flex items-center space-x-2">
+            {/* <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -179,18 +279,19 @@ export function DetailedAnalysisModal({
                 <Share className="h-4 w-4 mr-2" />
                 Share
               </Button>
-            </div>
+            </div> */}
           </DialogTitle>
           <DialogDescription className="text-base">
-            Analysis for: <span className="font-medium">"{analysisResult.prompt}"</span>
+            Analysis for:{" "}
+            <span className="font-medium">"{analysisResult.prompt || 'Unknown Prompt'}"</span>
           </DialogDescription>
           <div className="flex items-center space-x-3">
-            <Badge variant="outline">{analysisResult.topic}</Badge>
+            <Badge variant="outline">{analysisResult.topic || 'Unknown Topic'}</Badge>
             <Badge variant="outline">
-              Confidence: {analysisResult.confidence}%
+              Confidence: {analysisResult.confidence || 0}%
             </Badge>
             <span className="text-sm text-muted-foreground">
-              {new Date(analysisResult.timestamp).toLocaleString()}
+              {analysisResult.created_at ? new Date(analysisResult.created_at).toLocaleString() : 'Date unknown'}
             </span>
           </div>
         </DialogHeader>
@@ -210,14 +311,18 @@ export function DetailedAnalysisModal({
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-3 h-3 rounded-full ${llm.color}`} />
+                          <div
+                            className={`w-3 h-3 rounded-full ${llm.color}`}
+                          />
                           <CardTitle className="text-lg">{llm.name}</CardTitle>
                         </div>
                         <div className="flex items-center space-x-2">
                           {llm.data.mentioned ? (
                             <>
                               <Badge className="bg-success">Mentioned</Badge>
-                              <Badge variant="outline">Rank #{llm.data.rank}</Badge>
+                              <Badge variant="outline">
+                                Rank #{llm.data.rank}
+                              </Badge>
                             </>
                           ) : (
                             <Badge variant="outline">Not Mentioned</Badge>
@@ -230,10 +335,16 @@ export function DetailedAnalysisModal({
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium">Sentiment:</span>
+                              <span className="text-sm font-medium">
+                                Sentiment:
+                              </span>
                               <div className="flex items-center space-x-1">
                                 {getSentimentIcon(llm.data.sentiment)}
-                                <span className={`text-sm capitalize ${getSentimentColor(llm.data.sentiment)}`}>
+                                <span
+                                  className={`text-sm capitalize ${getSentimentColor(
+                                    llm.data.sentiment
+                                  )}`}
+                                >
                                   {llm.data.sentiment || "Neutral"}
                                 </span>
                               </div>
@@ -242,7 +353,9 @@ export function DetailedAnalysisModal({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleSaveFeedback(llm.name, "positive")}
+                                onClick={() =>
+                                  handleSaveFeedback(llm.name, "positive")
+                                }
                                 disabled={isSaving}
                               >
                                 <ThumbsUp className="h-4 w-4" />
@@ -250,7 +363,9 @@ export function DetailedAnalysisModal({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleSaveFeedback(llm.name, "negative")}
+                                onClick={() =>
+                                  handleSaveFeedback(llm.name, "negative")
+                                }
                                 disabled={isSaving}
                               >
                                 <ThumbsDown className="h-4 w-4" />
@@ -263,7 +378,8 @@ export function DetailedAnalysisModal({
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">
-                          Your brand was not mentioned in the response to this prompt.
+                          Your brand was not mentioned in the response to this
+                          prompt.
                         </div>
                       )}
                     </CardContent>
@@ -284,17 +400,30 @@ export function DetailedAnalysisModal({
                   <CardContent>
                     <div className="space-y-3">
                       <div className="p-4 bg-muted/50 rounded-lg">
-                        <p className="text-sm leading-relaxed">
-                          {mockResponses[llm.name.toLowerCase() as keyof typeof mockResponses]}
-                        </p>
+                        {llm.data.response ? (
+                          <MarkdownRenderer 
+                            content={llm.data.response} 
+                            className="text-sm"
+                          />
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No response available for this analysis.
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                           {llm.data.mentioned && (
                             <>
-                              <span>Mentioned at position #{llm.data.rank}</span>
+                              <span>
+                                Mentioned at position #{llm.data.rank}
+                              </span>
                               <span>•</span>
-                              <span className={getSentimentColor(llm.data.sentiment)}>
+                              <span
+                                className={getSentimentColor(
+                                  llm.data.sentiment
+                                )}
+                              >
                                 {llm.data.sentiment || "Neutral"} sentiment
                               </span>
                             </>
@@ -303,7 +432,11 @@ export function DetailedAnalysisModal({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => copyToClipboard(mockResponses[llm.name.toLowerCase() as keyof typeof mockResponses])}
+                          onClick={() =>
+                            copyToClipboard(
+                              llm.data.response || "No response available for this analysis."
+                            )
+                          }
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -317,10 +450,16 @@ export function DetailedAnalysisModal({
             <TabsContent value="insights" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Key Insights</CardTitle>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Lightbulb className="h-5 w-5" />
+                    <span>AI-Generated Insights</span>
+                  </CardTitle>
                   <CardDescription>
-                    Analysis summary and recommendations
+                    {insights.summary}
                   </CardDescription>
+                  <div className="text-xs text-muted-foreground">
+                    Generated on {new Date(insights.generatedAt).toLocaleString()}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -329,38 +468,62 @@ export function DetailedAnalysisModal({
                         <TrendingUp className="h-4 w-4 text-success" />
                         <span>Strengths</span>
                       </h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Mentioned by 2 out of 3 AI models</li>
-                        <li>• Positive sentiment across mentions</li>
-                        <li>• High ranking positions (#2, #3)</li>
-                        <li>• Consistent brand recognition</li>
-                      </ul>
+                      {insights.strengths.length > 0 ? (
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          {insights.strengths.map((strength, index) => (
+                            <li key={index}>• {strength}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No specific strengths identified from current analysis.
+                        </p>
+                      )}
                     </div>
-                    
+
                     <div className="space-y-2">
                       <h4 className="font-medium flex items-center space-x-2">
-                        <TrendingDown className="h-4 w-4 text-warning" />
+                        <Target className="h-4 w-4 text-warning" />
                         <span>Opportunities</span>
                       </h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Improve visibility in Gemini responses</li>
-                        <li>• Enhance keyword associations</li>
-                        <li>• Strengthen competitive positioning</li>
-                        <li>• Increase mention frequency</li>
-                      </ul>
+                      {insights.opportunities.length > 0 ? (
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          {insights.opportunities.map((opportunity, index) => (
+                            <li key={index}>• {opportunity}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No specific opportunities identified from current analysis.
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <Separator />
 
                   <div className="space-y-2">
-                    <h4 className="font-medium">Recommendations</h4>
-                    <div className="text-sm text-muted-foreground space-y-2">
-                      <p>• Focus on improving content and SEO for topics related to "{analysisResult.topic}"</p>
-                      <p>• Create more comprehensive documentation and case studies</p>
-                      <p>• Engage with AI training data sources and industry publications</p>
-                      <p>• Monitor competitor mentions and positioning strategies</p>
-                    </div>
+                    <h4 className="font-medium flex items-center space-x-2">
+                      <TrendingDown className="h-4 w-4 text-blue-500" />
+                      <span>Recommendations</span>
+                    </h4>
+                    {insights.recommendations.length > 0 ? (
+                      <div className="text-sm text-muted-foreground space-y-2">
+                        {insights.recommendations.map((recommendation, index) => (
+                          <div key={index} className="flex items-start space-x-2">
+                            <span className="text-blue-500 font-medium">•</span>
+                            <MarkdownRenderer 
+                              content={recommendation} 
+                              className="text-sm flex-1"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Continue monitoring performance and gather more data for specific recommendations.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -369,7 +532,7 @@ export function DetailedAnalysisModal({
         </Tabs>
 
         <div className="flex items-center justify-between pt-4 border-t">
-          <div className="flex space-x-2">
+          <div className="flex gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <LoadingButton
@@ -398,16 +561,16 @@ export function DetailedAnalysisModal({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
             <Button
               variant="outline"
               size="sm"
-              onClick={() => copyToClipboard(analysisResult.prompt)}
+              onClick={() => copyToClipboard(analysisResult.prompt || 'No prompt available')}
             >
               <Copy className="h-4 w-4 mr-2" />
               Copy Prompt
             </Button>
-            
+
             <Button variant="outline" size="sm">
               <Share className="h-4 w-4 mr-2" />
               Share

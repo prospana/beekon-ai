@@ -4,3 +4,12 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+export function convertToPercentage(value: number): string {
+  return `${(value * 100).toFixed(2)}`;
+}
+
+export function capitalize(str: string) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase();
+}

@@ -5,10 +5,10 @@ const n8nUrl = import.meta.env.VITE_N8N_URL;
 const n8nAuthUser = import.meta.env.VITE_BASIC_USER;
 const n8nAuthPass = import.meta.env.VITE_BASIC_PASS;
 
-export type HttpResponse = {
+export type HttpResponse<T = unknown> = {
   success: boolean;
   messages: string[];
-  data: unknown;
+  data: T;
 };
 
 export function noTrailingSlash(website: string) {
@@ -37,7 +37,7 @@ export async function httpRequest(
   requestHeaders: object | undefined,
   body: FormData | string | undefined = undefined
 ): Promise<HttpResponse> {
-  let data: HttpResponse | unknown;
+  let data: unknown = null;
   const headers: HeadersInit = new Headers();
 
   if (requestHeaders) {
