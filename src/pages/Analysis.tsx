@@ -30,11 +30,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAnalysisErrorHandler } from "@/hooks/useAnalysisError";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import {
-  analysisService,
-  type AnalysisResult,
-  type LLMResult,
-} from "@/services/analysisService";
+import { analysisService } from "@/services/analysisService";
+import { UIAnalysisResult } from "@/types/database";
 import {
   AlertCircle,
   Building,
@@ -67,12 +64,12 @@ export default function Analysis() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedResult, setSelectedResult] = useState<AnalysisResult | null>(
+  const [selectedResult, setSelectedResult] = useState<UIAnalysisResult | null>(
     null
   );
   const [isFiltering, setIsFiltering] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+  const [analysisResults, setAnalysisResults] = useState<UIAnalysisResult[]>([]);
   const [topics, setTopics] = useState<
     Array<{ id: string; name: string; resultCount: number }>
   >([]);

@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
-import { AnalysisResult, LLMResult } from "@/types/database";
+import { UIAnalysisResult, UILLMResult } from "@/types/database";
 
 export type AnalysisStatus = "pending" | "running" | "completed" | "failed";
 
@@ -202,7 +202,7 @@ export class AnalysisService {
       dateRange?: { start: string; end: string };
       searchQuery?: string;
     }
-  ): Promise<AnalysisResult[]> {
+  ): Promise<UIAnalysisResult[]> {
     let query = supabase
       .schema("beekon_data")
       .from("llm_analysis_results")
@@ -468,8 +468,8 @@ export class AnalysisService {
 
       if (error) throw error;
 
-      // Transform data to AnalysisResult format
-      const resultsMap = new Map<string, AnalysisResult>();
+      // Transform data to UIAnalysisResult format
+      const resultsMap = new Map<string, UIAnalysisResult>();
 
       data?.forEach((row) => {
         const promptId = row.prompt_id;
@@ -478,9 +478,9 @@ export class AnalysisService {
         if (!resultsMap.has(promptId)) {
           resultsMap.set(promptId, {
             id: promptId,
-            prompt: (row.prompts as any)?.prompt_text || "Unknown prompt",
+            prompt: (row.prompts as Record<string, unknown>)?.prompt_text as string || "Unknown prompt",
             website_id: row.website_id,
-            topic: (row.prompts as any)?.topics?.topic_name || "Unknown topic",
+            topic: ((row.prompts as Record<string, unknown>)?.topics as Record<string, unknown>)?.topic_name as string || "Unknown topic",
             status: "completed",
             confidence: row.confidence_score || 0,
             created_at:
@@ -522,7 +522,7 @@ export class AnalysisService {
     }
   }
 
-  private generateJsonExport(results: AnalysisResult[]): Blob {
+  private generateJsonExport(results: UIAnalysisResult[]): Blob {
     const exportData = {
       analysisResults: results,
       exportedAt: new Date().toISOString(),
@@ -538,7 +538,7 @@ export class AnalysisService {
     });
   }
 
-  private generateCsvExport(results: AnalysisResult[]): Blob {
+  private generateCsvExport(results: UIAnalysisResult[]): Blob {
     const headers = [
       "Analysis ID",
       "Prompt",
@@ -583,7 +583,7 @@ export class AnalysisService {
     return new Blob([csvContent], { type: "text/csv" });
   }
 
-  private generatePdfExport(results: AnalysisResult[]): Blob {
+  private generatePdfExport(results: UIAnalysisResult[]): Blob {
     // For now, generate a structured text document that can be saved as PDF
     // In a production environment, you would use a PDF library like jsPDF or Puppeteer
 

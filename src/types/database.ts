@@ -75,6 +75,14 @@ export interface LLMResult {
   analyzed_at: string;
 }
 
+export interface AnalysisInsights {
+  strengths: string[];
+  opportunities: string[];
+  recommendations: string[];
+  summary: string;
+  generatedAt: string;
+}
+
 export interface AnalysisResult {
   topic_name: string;
   topic_keywords: string[];
@@ -83,6 +91,33 @@ export interface AnalysisResult {
   avg_rank: number | null;
   avg_confidence: number | null;
   avg_sentiment: number | null;
+  insights?: AnalysisInsights;
+}
+
+// UI-specific analysis result format for DetailedAnalysisModal
+export interface UIAnalysisResult {
+  id: string;
+  prompt: string;
+  website_id: string;
+  topic: string;
+  status: string;
+  confidence: number;
+  created_at: string;
+  updated_at: string;
+  llm_results: UILLMResult[];
+  insights?: AnalysisInsights;
+}
+
+// UI-specific LLM result format
+export interface UILLMResult {
+  llm_provider: string;
+  is_mentioned: boolean;
+  rank_position: number | null;
+  confidence_score: number | null;
+  sentiment_score: number | null;
+  summary_text: string | null;
+  response_text: string | null;
+  analyzed_at: string;
 }
 
 // Competitor analysis result
