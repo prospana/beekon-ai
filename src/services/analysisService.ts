@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
-import { UIAnalysisResult, UILLMResult } from "@/types/database";
+import { AnalysisResult, UIAnalysisResult } from "@/types/database";
 
 export type AnalysisStatus = "pending" | "running" | "completed" | "failed";
 
@@ -478,9 +478,17 @@ export class AnalysisService {
         if (!resultsMap.has(promptId)) {
           resultsMap.set(promptId, {
             id: promptId,
-            prompt: (row.prompts as Record<string, unknown>)?.prompt_text as string || "Unknown prompt",
+            prompt:
+              ((row.prompts as Record<string, unknown>)
+                ?.prompt_text as string) || "Unknown prompt",
             website_id: row.website_id,
-            topic: ((row.prompts as Record<string, unknown>)?.topics as Record<string, unknown>)?.topic_name as string || "Unknown topic",
+            topic:
+              ((
+                (row.prompts as Record<string, unknown>)?.topics as Record<
+                  string,
+                  unknown
+                >
+              )?.topic_name as string) || "Unknown topic",
             status: "completed",
             confidence: row.confidence_score || 0,
             created_at:

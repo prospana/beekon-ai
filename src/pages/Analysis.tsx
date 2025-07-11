@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAnalysisErrorHandler } from "@/hooks/useAnalysisError";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { analysisService } from "@/services/analysisService";
+import { analysisService, LLMResult } from "@/services/analysisService";
 import { UIAnalysisResult } from "@/types/database";
 import {
   AlertCircle,
@@ -69,7 +69,9 @@ export default function Analysis() {
   );
   const [isFiltering, setIsFiltering] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<UIAnalysisResult[]>([]);
+  const [analysisResults, setAnalysisResults] = useState<UIAnalysisResult[]>(
+    []
+  );
   const [topics, setTopics] = useState<
     Array<{ id: string; name: string; resultCount: number }>
   >([]);
@@ -114,8 +116,6 @@ export default function Analysis() {
         selectedWebsite,
         filters
       );
-
-      console.log("results", results);
 
       setAnalysisResults(results);
     } catch (error) {
@@ -294,7 +294,7 @@ export default function Analysis() {
     }
   };
 
-  const handleViewDetails = (result: AnalysisResult) => {
+  const handleViewDetails = (result: UIAnalysisResult) => {
     setSelectedResult(result);
     setIsDetailModalOpen(true);
   };
@@ -640,7 +640,8 @@ export default function Analysis() {
                             {new Date(result.created_at).toLocaleDateString()}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
-                            Confidence: {result.confidence}%
+                            Confidence:{" "}
+                            {parseFloat(result.confidence.toFixed(2)) * 100}%
                           </Badge>
                         </div>
                       </div>
