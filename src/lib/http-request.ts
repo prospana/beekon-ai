@@ -2,8 +2,8 @@
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
 const n8nUrl = import.meta.env.VITE_N8N_URL;
-const n8nAuthUser = import.meta.env.VITE_BASIC_USER;
-const n8nAuthPass = import.meta.env.VITE_BASIC_PASS;
+const n8nAuthUser = import.meta.env.VITE_N8N_WEBHOOK_USER;
+const n8nAuthPass = import.meta.env.VITE_N8N_WEBHOOK_PASS;
 
 export type HttpResponse<T = unknown> = {
   success: boolean;
