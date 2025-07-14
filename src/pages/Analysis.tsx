@@ -98,7 +98,7 @@ export default function Analysis() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load analysis results
+  // Consolidated filter management
   const loadAnalysisResults = useCallback(async () => {
     if (!selectedWebsite) return;
 
@@ -112,12 +112,22 @@ export default function Analysis() {
         searchQuery: debouncedSearchQuery.trim() || undefined,
       };
 
+      console.log("Applying filters:", filters);
+
       const results = await analysisService.getAnalysisResults(
         selectedWebsite,
         filters
       );
 
-      console.log("results", results);
+      console.log("Filtered results:", results);
+      
+      // Validate filter results
+      if (filters.llmProvider) {
+        const hasFilteredProvider = results.some(result => 
+          result.llm_results.some(llm => llm.llm_provider === filters.llmProvider)
+        );
+        console.log(`LLM filter validation - Expected: ${filters.llmProvider}, Found: ${hasFilteredProvider}`);
+      }
 
       setAnalysisResults(results);
     } catch (error) {
@@ -192,15 +202,26 @@ export default function Analysis() {
   }, [selectedWebsite, handleError]);
 
   // Load data when dependencies change
+  // Consolidated filter and data management
+  useEffect(() => {
+    // Load metadata (topics and LLMs) when website changes
+    if (selectedWebsite) {
+      loadTopics();
+      loadAvailableLLMs();
+    }
+  }, [selectedWebsite, loadTopics, loadAvailableLLMs]);
+
+  // Load analysis results when filters change
   useEffect(() => {
     loadAnalysisResults();
   }, [loadAnalysisResults]);
 
-  // Filter validation - reset invalid filters when data changes
+  // Improved filter validation - only reset when necessary
   useEffect(() => {
     if (topics.length > 0 && selectedTopic !== "all") {
       const topicExists = topics.some((topic) => topic.id === selectedTopic);
       if (!topicExists) {
+        console.log("Resetting invalid topic filter:", selectedTopic);
         setSelectedTopic("all");
       }
     }
@@ -210,15 +231,11 @@ export default function Analysis() {
     if (availableLLMs.length > 0 && selectedLLM !== "all") {
       const llmExists = availableLLMs.some((llm) => llm.id === selectedLLM);
       if (!llmExists) {
+        console.log("Resetting invalid LLM filter:", selectedLLM);
         setSelectedLLM("all");
       }
     }
   }, [availableLLMs, selectedLLM]);
-
-  useEffect(() => {
-    loadTopics();
-    loadAvailableLLMs();
-  }, [loadTopics, loadAvailableLLMs]);
 
   // No need for legacy format transformation - work directly with modern format
   const filteredResults = analysisResults;

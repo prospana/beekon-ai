@@ -138,6 +138,7 @@ export interface UILLMResult {
   summary_text: string | null;
   response_text: string | null;
   analyzed_at: string;
+  isFiltered?: boolean; // Flag to indicate if this result matches the current filter
 }
 
 // Competitor analysis result

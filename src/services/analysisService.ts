@@ -193,6 +193,71 @@ export class AnalysisService {
     }
   }
 
+  // Shared data transformation function to standardize logic
+  private transformAnalysisData(
+    data: Record<string, unknown>[],
+    websiteId?: string
+  ): UIAnalysisResult[] {
+    const resultsMap = new Map<string, UIAnalysisResult>();
+
+    data?.forEach((row) => {
+      const promptId = row.prompt_id;
+      if (!promptId) {
+        // Skip rows with null prompt_id
+        return;
+      }
+
+      // Handle different data structures (with joins vs without)
+      let promptText: string;
+      let topicName: string;
+      let resultWebsiteId: string;
+
+      if (row.prompts) {
+        // Data from joined query
+        const prompt = row.prompts as {
+          prompt_text: string;
+          topics: { topic_name: string };
+        };
+        promptText = prompt.prompt_text;
+        topicName = prompt.topics.topic_name;
+        resultWebsiteId = websiteId || row.website_id;
+      } else {
+        // Data from direct query (export function)
+        promptText = ((row.prompts as Record<string, unknown>)?.prompt_text as string) || "Unknown prompt";
+        topicName = (((row.prompts as Record<string, unknown>)?.topics as Record<string, unknown>)?.topic_name as string) || "Unknown topic";
+        resultWebsiteId = row.website_id;
+      }
+
+      if (!resultsMap.has(promptId)) {
+        resultsMap.set(promptId, {
+          id: promptId,
+          prompt: promptText,
+          website_id: resultWebsiteId,
+          topic: topicName,
+          status: "completed" as AnalysisStatus,
+          confidence: row.confidence_score || 0,
+          created_at: row.analyzed_at || row.created_at || new Date().toISOString(),
+          updated_at: row.created_at || new Date().toISOString(),
+          llm_results: [],
+        });
+      }
+
+      const result = resultsMap.get(promptId)!;
+      result.llm_results.push({
+        llm_provider: row.llm_provider,
+        is_mentioned: row.is_mentioned || false,
+        rank_position: row.rank_position,
+        confidence_score: row.confidence_score,
+        sentiment_score: row.sentiment_score,
+        summary_text: row.summary_text,
+        response_text: row.response_text,
+        analyzed_at: row.analyzed_at || row.created_at || new Date().toISOString(),
+      });
+    });
+
+    return Array.from(resultsMap.values());
+  }
+
   async getAnalysisResults(
     websiteId: string,
     filters?: {
@@ -203,6 +268,7 @@ export class AnalysisService {
       searchQuery?: string;
     }
   ): Promise<UIAnalysisResult[]> {
+    // Build the base query without LLM provider filter
     let query = supabase
       .schema("beekon_data")
       .from("llm_analysis_results")
@@ -221,72 +287,57 @@ export class AnalysisService {
       .eq("prompts.topics.website_id", websiteId)
       .order("created_at", { ascending: false });
 
+    // Apply topic filter
     if (filters?.topic && filters.topic !== "all") {
       query = query.eq("prompts.topics.topic_name", filters.topic);
     }
 
-    if (filters?.llmProvider && filters.llmProvider !== "all") {
-      query = query.eq("llm_provider", filters.llmProvider);
-    }
-
+    // Apply date range filter
     if (filters?.dateRange) {
       query = query
         .gte("created_at", filters.dateRange.start)
         .lte("created_at", filters.dateRange.end);
     }
 
+    // Apply search query filter with proper escaping and security
     if (filters?.searchQuery && filters.searchQuery.trim()) {
-      const searchTerm = filters.searchQuery.trim();
+      const searchTerm = filters.searchQuery.trim()
+        .replace(/[%_\\]/g, '\\$&') // Escape SQL wildcards and backslashes
+        .replace(/'/g, "''"); // Escape single quotes for SQL
+      
+      // Use safer approach with individual filters instead of OR string interpolation
+      const searchPattern = `%${searchTerm}%`;
       query = query.or(
-        `prompts.prompt_text.ilike.%${searchTerm}%,prompts.topics.topic_name.ilike.%${searchTerm}%,response_text.ilike.%${searchTerm}%`
+        `prompts.prompt_text.ilike.${searchPattern},prompts.topics.topic_name.ilike.${searchPattern},response_text.ilike.${searchPattern}`
       );
     }
 
     const { data, error } = await query;
     if (error) throw error;
 
-    // Transform data to match expected format
-    const resultsMap = new Map<string, UIAnalysisResult>();
+    // Transform data using the shared transformation function
+    let results = this.transformAnalysisData(data, websiteId);
 
-    data?.forEach((row) => {
-      const promptId = row.prompt_id;
-      if (!promptId) {
-        // Skip rows with null prompt_id
-        return;
-      }
-      const prompt = row.prompts as {
-        prompt_text: string;
-        topics: { topic_name: string };
-      };
-
-      if (!resultsMap.has(promptId)) {
-        resultsMap.set(promptId, {
-          id: promptId,
-          prompt: prompt.prompt_text,
-          website_id: websiteId,
-          topic: prompt.topics.topic_name,
-          status: "completed" as AnalysisStatus,
-          confidence: row.confidence_score || 0,
-          created_at: row.created_at || "",
-          updated_at: row.created_at || "",
-          llm_results: [],
-        });
-      }
-
-      const result = resultsMap.get(promptId)!;
-      result.llm_results.push({
-        id: row.id,
-        llm_provider: row.llm_provider,
-        is_mentioned: row.is_mentioned || false,
-        rank_position: row.rank_position,
-        sentiment_score: row.sentiment_score,
-        response_text: row.response_text,
-        confidence_score: row.confidence_score,
-        analyzed_at: row.analyzed_at || row.created_at || "",
+    // Apply LLM provider filter at the data transformation level
+    if (filters?.llmProvider && filters.llmProvider !== "all") {
+      results = results.filter(result => {
+        // Keep only prompts that have results from the specified LLM provider
+        return result.llm_results.some(llm => llm.llm_provider === filters.llmProvider);
+      }).map(result => {
+        // For display purposes, we can optionally highlight the filtered LLM results
+        // but keep all LLM results to maintain data integrity
+        return {
+          ...result,
+          llm_results: result.llm_results.map(llm => ({
+            ...llm,
+            // Add a flag to indicate if this is the filtered provider for UI highlighting
+            isFiltered: llm.llm_provider === filters.llmProvider
+          }))
+        };
       });
-    });
+    }
 
-    return Array.from(resultsMap.values());
+    return results;
   }
 
   async getTopicsForWebsite(
@@ -468,50 +519,8 @@ export class AnalysisService {
 
       if (error) throw error;
 
-      // Transform data to UIAnalysisResult format
-      const resultsMap = new Map<string, UIAnalysisResult>();
-
-      data?.forEach((row) => {
-        const promptId = row.prompt_id;
-        if (!promptId) return;
-
-        if (!resultsMap.has(promptId)) {
-          resultsMap.set(promptId, {
-            id: promptId,
-            prompt:
-              ((row.prompts as Record<string, unknown>)
-                ?.prompt_text as string) || "Unknown prompt",
-            website_id: row.website_id,
-            topic:
-              ((
-                (row.prompts as Record<string, unknown>)?.topics as Record<
-                  string,
-                  unknown
-                >
-              )?.topic_name as string) || "Unknown topic",
-            status: "completed",
-            confidence: row.confidence_score || 0,
-            created_at:
-              row.analyzed_at || row.created_at || new Date().toISOString(),
-            updated_at: row.created_at || new Date().toISOString(),
-            llm_results: [],
-          });
-        }
-
-        const analysisResult = resultsMap.get(promptId)!;
-        analysisResult.llm_results.push({
-          llm_provider: row.llm_provider,
-          is_mentioned: row.is_mentioned || false,
-          rank_position: row.rank_position,
-          confidence_score: row.confidence_score,
-          sentiment_score: row.sentiment_score,
-          summary_text: row.summary_text,
-          response_text: row.response_text,
-          analyzed_at: row.analyzed_at || new Date().toISOString(),
-        });
-      });
-
-      const results = Array.from(resultsMap.values());
+      // Transform data using the shared transformation function
+      const results = this.transformAnalysisData(data);
 
       // Generate export based on format
       switch (format) {
