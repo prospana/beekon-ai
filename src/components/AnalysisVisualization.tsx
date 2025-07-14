@@ -7,11 +7,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { AnalysisResult } from "@/types/database";
+import { UIAnalysisResult } from "@/types/database";
 import { BarChart3, Target, TrendingDown, TrendingUp, Zap } from "lucide-react";
 
 interface AnalysisVisualizationProps {
-  results: AnalysisResult[];
+  results: UIAnalysisResult[];
 }
 
 export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
@@ -202,7 +202,7 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
 }
 
 // Sentiment Chart Component
-export function SentimentChart({ results }: { results: AnalysisResult[] }) {
+export function SentimentChart({ results }: { results: UIAnalysisResult[] }) {
   const sentimentCounts = {
     positive: 0,
     negative: 0,
@@ -264,7 +264,7 @@ export function SentimentChart({ results }: { results: AnalysisResult[] }) {
 }
 
 // Ranking Performance Chart
-export function RankingChart({ results }: { results: AnalysisResult[] }) {
+export function RankingChart({ results }: { results: UIAnalysisResult[] }) {
   const rankingData = {
     1: 0,
     2: 0,

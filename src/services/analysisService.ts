@@ -201,7 +201,7 @@ export class AnalysisService {
     const resultsMap = new Map<string, UIAnalysisResult>();
 
     data?.forEach((row) => {
-      const promptId = row.prompt_id;
+      const promptId = row.prompt_id as string;
       if (!promptId) {
         // Skip rows with null prompt_id
         return;
@@ -220,12 +220,20 @@ export class AnalysisService {
         };
         promptText = prompt.prompt_text;
         topicName = prompt.topics.topic_name;
-        resultWebsiteId = websiteId || row.website_id;
+        resultWebsiteId = websiteId || (row.website_id as string);
       } else {
         // Data from direct query (export function)
-        promptText = ((row.prompts as Record<string, unknown>)?.prompt_text as string) || "Unknown prompt";
-        topicName = (((row.prompts as Record<string, unknown>)?.topics as Record<string, unknown>)?.topic_name as string) || "Unknown topic";
-        resultWebsiteId = row.website_id;
+        promptText =
+          ((row.prompts as Record<string, unknown>)?.prompt_text as string) ||
+          "Unknown prompt";
+        topicName =
+          ((
+            (row.prompts as Record<string, unknown>)?.topics as Record<
+              string,
+              unknown
+            >
+          )?.topic_name as string) || "Unknown topic";
+        resultWebsiteId = row.website_id as string;
       }
 
       if (!resultsMap.has(promptId)) {
@@ -235,23 +243,29 @@ export class AnalysisService {
           website_id: resultWebsiteId,
           topic: topicName,
           status: "completed" as AnalysisStatus,
-          confidence: row.confidence_score || 0,
-          created_at: row.analyzed_at || row.created_at || new Date().toISOString(),
-          updated_at: row.created_at || new Date().toISOString(),
+          confidence: (row.confidence_score as number) || 0,
+          created_at:
+            (row.analyzed_at as string) ||
+            (row.created_at as string) ||
+            new Date().toISOString(),
+          updated_at: (row.created_at as string) || new Date().toISOString(),
           llm_results: [],
         });
       }
 
       const result = resultsMap.get(promptId)!;
       result.llm_results.push({
-        llm_provider: row.llm_provider,
-        is_mentioned: row.is_mentioned || false,
-        rank_position: row.rank_position,
-        confidence_score: row.confidence_score,
-        sentiment_score: row.sentiment_score,
-        summary_text: row.summary_text,
-        response_text: row.response_text,
-        analyzed_at: row.analyzed_at || row.created_at || new Date().toISOString(),
+        llm_provider: row.llm_provider as string,
+        is_mentioned: (row.is_mentioned as boolean) || false,
+        rank_position: row.rank_position as number,
+        confidence_score: row.confidence_score as number,
+        sentiment_score: row.sentiment_score as number,
+        summary_text: row.summary_text as string,
+        response_text: row.response_text as string,
+        analyzed_at:
+          (row.analyzed_at as string) ||
+          (row.created_at as string) ||
+          new Date().toISOString(),
       });
     });
 
@@ -278,6 +292,7 @@ export class AnalysisService {
         prompts!inner (
           prompt_text,
           topics!inner (
+            id,
             topic_name,
             website_id
           )
@@ -287,9 +302,10 @@ export class AnalysisService {
       .eq("prompts.topics.website_id", websiteId)
       .order("created_at", { ascending: false });
 
-    // Apply topic filter
+    // Apply topic filter (filter by topic ID, not name)
     if (filters?.topic && filters.topic !== "all") {
-      query = query.eq("prompts.topics.topic_name", filters.topic);
+      console.log("Applying topic filter:", filters.topic);
+      query = query.eq("prompts.topics.id", filters.topic);
     }
 
     // Apply date range filter
@@ -301,40 +317,54 @@ export class AnalysisService {
 
     // Apply search query filter with proper escaping and security
     if (filters?.searchQuery && filters.searchQuery.trim()) {
-      const searchTerm = filters.searchQuery.trim()
-        .replace(/[%_\\]/g, '\\$&') // Escape SQL wildcards and backslashes
+      const searchTerm = filters.searchQuery
+        .trim()
+        .replace(/[%_\\]/g, "\\$&") // Escape SQL wildcards and backslashes
         .replace(/'/g, "''"); // Escape single quotes for SQL
-      
-      // Use safer approach with individual filters instead of OR string interpolation
-      const searchPattern = `%${searchTerm}%`;
+
+      console.log("Applying search filter:", searchTerm);
+
+      // Use correct Supabase OR query syntax
       query = query.or(
-        `prompts.prompt_text.ilike.${searchPattern},prompts.topics.topic_name.ilike.${searchPattern},response_text.ilike.${searchPattern}`
+        `prompts.prompt_text.ilike.%${searchTerm}%,prompts.topics.topic_name.ilike.%${searchTerm}%,response_text.ilike.%${searchTerm}%`
       );
     }
 
+    console.log("Executing query with filters:", filters);
     const { data, error } = await query;
-    if (error) throw error;
+
+    if (error) {
+      console.error("Database query error:", error);
+      console.error("Query filters:", filters);
+      throw error;
+    }
+
+    console.log("Query returned", data?.length || 0, "rows");
 
     // Transform data using the shared transformation function
     let results = this.transformAnalysisData(data, websiteId);
 
     // Apply LLM provider filter at the data transformation level
     if (filters?.llmProvider && filters.llmProvider !== "all") {
-      results = results.filter(result => {
-        // Keep only prompts that have results from the specified LLM provider
-        return result.llm_results.some(llm => llm.llm_provider === filters.llmProvider);
-      }).map(result => {
-        // For display purposes, we can optionally highlight the filtered LLM results
-        // but keep all LLM results to maintain data integrity
-        return {
-          ...result,
-          llm_results: result.llm_results.map(llm => ({
-            ...llm,
-            // Add a flag to indicate if this is the filtered provider for UI highlighting
-            isFiltered: llm.llm_provider === filters.llmProvider
-          }))
-        };
-      });
+      results = results
+        .filter((result) => {
+          // Keep only prompts that have results from the specified LLM provider
+          return result.llm_results.some(
+            (llm) => llm.llm_provider === filters.llmProvider
+          );
+        })
+        .map((result) => {
+          // For display purposes, we can optionally highlight the filtered LLM results
+          // but keep all LLM results to maintain data integrity
+          return {
+            ...result,
+            llm_results: result.llm_results.map((llm) => ({
+              ...llm,
+              // Add a flag to indicate if this is the filtered provider for UI highlighting
+              isFiltered: llm.llm_provider === filters.llmProvider,
+            })),
+          };
+        });
     }
 
     return results;

@@ -120,13 +120,31 @@ export default function Analysis() {
       );
 
       console.log("Filtered results:", results);
-      
+
       // Validate filter results
       if (filters.llmProvider) {
-        const hasFilteredProvider = results.some(result => 
-          result.llm_results.some(llm => llm.llm_provider === filters.llmProvider)
+        const hasFilteredProvider = results.some((result) =>
+          result.llm_results.some(
+            (llm) => llm.llm_provider === filters.llmProvider
+          )
         );
-        console.log(`LLM filter validation - Expected: ${filters.llmProvider}, Found: ${hasFilteredProvider}`);
+        console.log(
+          `LLM filter validation - Expected: ${filters.llmProvider}, Found: ${hasFilteredProvider}`
+        );
+      }
+      
+      if (filters.topic) {
+        const hasFilteredTopic = results.some((result) => 
+          result.topic === filters.topic || 
+          topics.find(t => t.id === filters.topic)?.name === result.topic
+        );
+        console.log(
+          `Topic filter validation - Expected ID: ${filters.topic}, Found matching results: ${hasFilteredTopic}`
+        );
+      }
+      
+      if (filters.searchQuery) {
+        console.log(`Search filter applied for: "${filters.searchQuery}", Results: ${results.length}`);
       }
 
       setAnalysisResults(results);
