@@ -110,7 +110,11 @@ export default function Websites() {
     // This is a placeholder implementation
     // In a real application, this would fetch from the database
 
-    return websiteMetrics[websiteId] ?? [];
+    if (!websiteId) {
+      return { totalTopics: 0, avgVisibility: 0 };
+    }
+
+    return websiteMetrics[websiteId];
   };
 
   const handleAddWebsite = async () => {
@@ -203,7 +207,11 @@ export default function Websites() {
     setSelectedWebsite(null);
   };
 
-  const handleAnalyzeNow = async (websiteId: string, domain: string) => {
+  const handleAnalyzeNow = async (
+    websiteId: string,
+    domain: string,
+    name: string
+  ) => {
     setIsAnalyzing(websiteId);
     if (!websiteId) {
       toast({
@@ -216,6 +224,7 @@ export default function Websites() {
     const response = await sendN8nWebhook("webhook/re-analyze", {
       id: websiteId,
       website: domain,
+      name: name,
     });
 
     if (!response.success) {
@@ -426,7 +435,11 @@ export default function Websites() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
-                          handleAnalyzeNow(website.id, website.domain)
+                          handleAnalyzeNow(
+                            website.id,
+                            website.domain,
+                            website.display_name
+                          )
                         }
                         disabled={isAnalyzing === website.id}
                       >
@@ -471,7 +484,7 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Total Topics</p>
                     <p className="text-sm text-muted-foreground">
-                      {getWebsiteMetrics(website.id).totalTopics}
+                      {getWebsiteMetrics(website.id)?.totalTopics}
                     </p>
                   </div>
                 </div>
@@ -480,7 +493,7 @@ export default function Websites() {
                   <div>
                     <p className="text-sm font-medium">Avg Visibility</p>
                     <p className="text-sm text-muted-foreground">
-                      {getWebsiteMetrics(website.id).avgVisibility}%
+                      {getWebsiteMetrics(website.id)?.avgVisibility}%
                     </p>
                   </div>
                 </div>

@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAnalysisErrorHandler } from "@/hooks/useAnalysisError";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { capitalizeFirstLetters } from "@/lib/utils";
 import { analysisService, LLMResult } from "@/services/analysisService";
 import { UIAnalysisResult } from "@/types/database";
 import {
@@ -100,7 +101,9 @@ export default function Analysis() {
 
   // Consolidated filter management
   const loadAnalysisResults = useCallback(async () => {
-    if (!selectedWebsite) return;
+    if (!selectedWebsite) {
+      return;
+    }
 
     setIsLoadingResults(true);
     clearError();
@@ -112,7 +115,7 @@ export default function Analysis() {
         searchQuery: debouncedSearchQuery.trim() || undefined,
       };
 
-      console.log("Applying filters:", filters);
+      console.log("📋 Applying filters:", filters);
 
       const results = await analysisService.getAnalysisResults(
         selectedWebsite,
@@ -121,35 +124,10 @@ export default function Analysis() {
 
       console.log("Filtered results:", results);
 
-      // Validate filter results
-      if (filters.llmProvider) {
-        const hasFilteredProvider = results.some((result) =>
-          result.llm_results.some(
-            (llm) => llm.llm_provider === filters.llmProvider
-          )
-        );
-        console.log(
-          `LLM filter validation - Expected: ${filters.llmProvider}, Found: ${hasFilteredProvider}`
-        );
-      }
-      
-      if (filters.topic) {
-        const hasFilteredTopic = results.some((result) => 
-          result.topic === filters.topic || 
-          topics.find(t => t.id === filters.topic)?.name === result.topic
-        );
-        console.log(
-          `Topic filter validation - Expected ID: ${filters.topic}, Found matching results: ${hasFilteredTopic}`
-        );
-      }
-      
-      if (filters.searchQuery) {
-        console.log(`Search filter applied for: "${filters.searchQuery}", Results: ${results.length}`);
-      }
-
       setAnalysisResults(results);
     } catch (error) {
-      console.error("Failed to load analysis results:", error);
+      console.error("❌ Failed to load analysis results:", error);
+      console.error("❌ Error details:", error);
       handleError(error);
       toast({
         title: "Error",
@@ -332,7 +310,6 @@ export default function Analysis() {
   };
 
   const handleViewDetails = (result: UIAnalysisResult) => {
-    console.log("result", result);
     setSelectedResult(result);
     setIsDetailModalOpen(true);
   };
@@ -343,6 +320,16 @@ export default function Analysis() {
     setSelectedTopic("all");
     setSelectedLLM("all");
     setSearchQuery("");
+  };
+
+  const getTopicName = (id: string): string => {
+    if (!id) {
+      return "";
+    }
+
+    const index = topics.findIndex((topic) => topic.id === id);
+
+    return topics[index]!.name || "";
   };
 
   const handleRemoveFilter = (filterType: "topic" | "llm" | "search") => {
@@ -631,7 +618,10 @@ export default function Analysis() {
           {!loading && !isLoadingResults && hasActiveFilters && (
             <FilterBreadcrumbs
               filters={{
-                topic: selectedTopic !== "all" ? selectedTopic : undefined,
+                topic:
+                  selectedTopic !== "all"
+                    ? capitalizeFirstLetters(getTopicName(selectedTopic))
+                    : undefined,
                 llm: selectedLLM !== "all" ? selectedLLM : undefined,
                 search: searchQuery.trim() || undefined,
               }}

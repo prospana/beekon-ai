@@ -88,7 +88,7 @@ export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
   );
 
   const avgConfidence =
-    results.reduce((acc, r) => acc + r.confidence, 0) / results.length;
+    results.reduce((acc, r) => acc + r.confidence * 100, 0) / results.length;
 
   // Topic distribution
   const topicCounts = results.reduce((acc, r) => {

@@ -213,14 +213,16 @@ export class AnalysisService {
       let resultWebsiteId: string;
 
       if (row.prompts) {
-        // Data from joined query
+        // Data from joined query with nested topics
         const prompt = row.prompts as {
+          id: string;
           prompt_text: string;
-          topics: { topic_name: string };
+          topic_id: string;
+          topics: { id: string; topic_name: string; website_id: string };
         };
         promptText = prompt.prompt_text;
         topicName = prompt.topics.topic_name;
-        resultWebsiteId = websiteId || (row.website_id as string);
+        resultWebsiteId = websiteId || prompt.topics.website_id;
       } else {
         // Data from direct query (export function)
         promptText =
@@ -282,7 +284,8 @@ export class AnalysisService {
       searchQuery?: string;
     }
   ): Promise<UIAnalysisResult[]> {
-    // Build the base query without LLM provider filter
+    // Build the base query with correct join structure
+    // Note: prompts.topic_id references topics.id
     let query = supabase
       .schema("beekon_data")
       .from("llm_analysis_results")
@@ -290,7 +293,9 @@ export class AnalysisService {
         `
         *,
         prompts!inner (
+          id,
           prompt_text,
+          topic_id,
           topics!inner (
             id,
             topic_name,
@@ -302,17 +307,14 @@ export class AnalysisService {
       .eq("prompts.topics.website_id", websiteId)
       .order("created_at", { ascending: false });
 
-    // Apply topic filter (filter by topic ID, not name)
+    // Apply topic filter using the correct foreign key relationship
     if (filters?.topic && filters.topic !== "all") {
-      console.log("Applying topic filter:", filters.topic);
-      query = query.eq("prompts.topics.id", filters.topic);
+      query = query.eq("prompts.topic_id", filters.topic);
     }
 
     // Apply date range filter
     if (filters?.dateRange) {
-      query = query
-        .gte("created_at", filters.dateRange.start)
-        .lte("created_at", filters.dateRange.end);
+      query = query.lte("created_at", filters.dateRange.end);
     }
 
     // Apply search query filter with proper escaping and security
@@ -324,22 +326,20 @@ export class AnalysisService {
 
       console.log("Applying search filter:", searchTerm);
 
-      // Use correct Supabase OR query syntax
+      // Use correct Supabase OR query syntax with proper join paths
       query = query.or(
         `prompts.prompt_text.ilike.%${searchTerm}%,prompts.topics.topic_name.ilike.%${searchTerm}%,response_text.ilike.%${searchTerm}%`
       );
     }
 
-    console.log("Executing query with filters:", filters);
     const { data, error } = await query;
 
     if (error) {
       console.error("Database query error:", error);
+      console.error("Error details:", error.message);
       console.error("Query filters:", filters);
       throw error;
     }
-
-    console.log("Query returned", data?.length || 0, "rows");
 
     // Transform data using the shared transformation function
     let results = this.transformAnalysisData(data, websiteId);
