@@ -15,7 +15,8 @@
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
       "Bash(npx supabase link:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

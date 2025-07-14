@@ -117,6 +117,8 @@ export default function Analysis() {
         filters
       );
 
+      console.log("results", results);
+
       setAnalysisResults(results);
     } catch (error) {
       console.error("Failed to load analysis results:", error);
@@ -295,6 +297,7 @@ export default function Analysis() {
   };
 
   const handleViewDetails = (result: UIAnalysisResult) => {
+    console.log("result", result);
     setSelectedResult(result);
     setIsDetailModalOpen(true);
   };

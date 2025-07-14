@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
-import { AnalysisResult, UIAnalysisResult } from "@/types/database";
+import { AnalysisResult, LLMResult, UIAnalysisResult } from "@/types/database";
 
 export type AnalysisStatus = "pending" | "running" | "completed" | "failed";
 
@@ -246,7 +246,7 @@ export class AnalysisService {
     if (error) throw error;
 
     // Transform data to match expected format
-    const resultsMap = new Map<string, AnalysisResult>();
+    const resultsMap = new Map<string, UIAnalysisResult>();
 
     data?.forEach((row) => {
       const promptId = row.prompt_id;
