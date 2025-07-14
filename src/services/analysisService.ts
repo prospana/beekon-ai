@@ -211,30 +211,40 @@ export class AnalysisService {
       let promptText: string;
       let topicName: string;
       let resultWebsiteId: string;
+      let reportingText: string | null = null;
+      let recommendationText: string | null = null;
+      let promptStrengths: string[] | null = null;
+      let promptOpportunities: string[] | null = null;
 
       if (row.prompts) {
         // Data from joined query with nested topics
         const prompt = row.prompts as {
           id: string;
           prompt_text: string;
+          reporting_text: string | null;
+          recommendation_text: string | null;
+          strengths: string[] | null;
+          opportunities: string[] | null;
           topic_id: string;
           topics: { id: string; topic_name: string; website_id: string };
         };
         promptText = prompt.prompt_text;
         topicName = prompt.topics.topic_name;
         resultWebsiteId = websiteId || prompt.topics.website_id;
+        reportingText = prompt.reporting_text;
+        recommendationText = prompt.recommendation_text;
+        promptStrengths = prompt.strengths;
+        promptOpportunities = prompt.opportunities;
       } else {
         // Data from direct query (export function)
-        promptText =
-          ((row.prompts as Record<string, unknown>)?.prompt_text as string) ||
-          "Unknown prompt";
+        const prompts = row.prompts as Record<string, unknown>;
+        promptText = (prompts?.prompt_text as string) || "Unknown prompt";
+        reportingText = (prompts?.reporting_text as string) || null;
+        recommendationText = (prompts?.recommendation_text as string) || null;
+        promptStrengths = (prompts?.strengths as string[]) || null;
+        promptOpportunities = (prompts?.opportunities as string[]) || null;
         topicName =
-          ((
-            (row.prompts as Record<string, unknown>)?.topics as Record<
-              string,
-              unknown
-            >
-          )?.topic_name as string) || "Unknown topic";
+          ((prompts?.topics as Record<string, unknown>)?.topic_name as string) || "Unknown topic";
         resultWebsiteId = row.website_id as string;
       }
 
@@ -251,6 +261,10 @@ export class AnalysisService {
             (row.created_at as string) ||
             new Date().toISOString(),
           updated_at: (row.created_at as string) || new Date().toISOString(),
+          reporting_text: reportingText,
+          recommendation_text: recommendationText,
+          prompt_strengths: promptStrengths,
+          prompt_opportunities: promptOpportunities,
           llm_results: [],
         });
       }
@@ -295,6 +309,10 @@ export class AnalysisService {
         prompts!inner (
           id,
           prompt_text,
+          reporting_text,
+          recommendation_text,
+          strengths,
+          opportunities,
           topic_id,
           topics!inner (
             id,
@@ -538,6 +556,10 @@ export class AnalysisService {
           prompts (
             id,
             prompt_text,
+            reporting_text,
+            recommendation_text,
+            strengths,
+            opportunities,
             topics (
               topic_name,
               topic_keywords

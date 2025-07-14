@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { analysisService } from "@/services/analysisService";
 import { InsightService } from "@/services/insightService";
+import { UIAnalysisResult } from "@/types/database";
 import {
   BarChart3,
   ChevronDown,
@@ -44,8 +45,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { useState, useMemo } from "react";
-import { UIAnalysisResult, UILLMResult } from "@/types/database";
+import { useMemo, useState } from "react";
 
 interface DetailedAnalysisModalProps {
   isOpen: boolean;
@@ -70,55 +70,56 @@ export function DetailedAnalysisModal({
         strengths: [],
         opportunities: [],
         recommendations: [],
-        summary: 'No analysis data available',
-        generatedAt: new Date().toISOString()
+        summary: "No analysis data available",
+        generatedAt: new Date().toISOString(),
+        sources: {
+          summary: "calculated" as const,
+          strengths: "calculated" as const,
+          opportunities: "calculated" as const,
+          recommendations: "calculated" as const,
+        },
       };
     }
-    
+
     try {
       // Validate that llm_results exists and is an array
-      if (!analysisResult.llm_results || !Array.isArray(analysisResult.llm_results)) {
+      if (
+        !analysisResult.llm_results ||
+        !Array.isArray(analysisResult.llm_results)
+      ) {
         return {
           strengths: [],
           opportunities: [],
-          recommendations: ['Unable to generate insights - invalid analysis data'],
-          summary: 'Analysis data is incomplete or corrupted',
-          generatedAt: new Date().toISOString()
+          recommendations: [
+            "Unable to generate insights - invalid analysis data",
+          ],
+          summary: "Analysis data is incomplete or corrupted",
+          generatedAt: new Date().toISOString(),
+          sources: {
+            summary: "calculated" as const,
+            strengths: "calculated" as const,
+            opportunities: "calculated" as const,
+            recommendations: "calculated" as const,
+          },
         };
       }
 
-      // Convert UI format to AnalysisResult format for InsightService
-      const analysisResultForInsights = {
-        topic_name: analysisResult.topic || 'Unknown Topic',
-        topic_keywords: [analysisResult.topic || 'Unknown Topic'], // Fallback since we don't have keywords in UI format
-        llm_results: analysisResult.llm_results.map(llm => ({
-          llm_provider: llm.llm_provider || 'unknown',
-          is_mentioned: Boolean(llm.is_mentioned),
-          rank_position: llm.rank_position,
-          confidence_score: llm.confidence_score,
-          sentiment_score: llm.sentiment_score,
-          summary_text: llm.summary_text,
-          response_text: llm.response_text,
-          analyzed_at: llm.analyzed_at || new Date().toISOString()
-        })),
-        total_mentions: analysisResult.llm_results.filter(llm => llm.is_mentioned).length,
-        avg_rank: analysisResult.llm_results.length > 0 ? 
-          analysisResult.llm_results.reduce((sum, llm) => sum + (llm.rank_position || 0), 0) / analysisResult.llm_results.length : null,
-        avg_confidence: analysisResult.llm_results.length > 0 ? 
-          analysisResult.llm_results.reduce((sum, llm) => sum + (llm.confidence_score || 0), 0) / analysisResult.llm_results.length : null,
-        avg_sentiment: analysisResult.llm_results.length > 0 ? 
-          analysisResult.llm_results.reduce((sum, llm) => sum + (llm.sentiment_score || 0), 0) / analysisResult.llm_results.length : null,
-      };
-      
-      return InsightService.generateInsights([analysisResultForInsights]);
+      // Pass UIAnalysisResult directly to InsightService (now supports prompt-specific data)
+      return InsightService.generateInsights([analysisResult]);
     } catch (error) {
-      console.error('Error generating insights:', error);
+      console.error("Error generating insights:", error);
       return {
         strengths: [],
         opportunities: [],
-        recommendations: ['Unable to generate insights due to an error'],
-        summary: 'Error occurred while analyzing the data',
-        generatedAt: new Date().toISOString()
+        recommendations: ["Unable to generate insights due to an error"],
+        summary: "Error occurred while analyzing the data",
+        generatedAt: new Date().toISOString(),
+        sources: {
+          summary: "calculated" as const,
+          strengths: "calculated" as const,
+          opportunities: "calculated" as const,
+          recommendations: "calculated" as const,
+        },
       };
     }
   }, [analysisResult]);
@@ -228,32 +229,59 @@ export function DetailedAnalysisModal({
     {
       name: "ChatGPT",
       data: {
-        mentioned: analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.is_mentioned || false,
-        rank: analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.rank_position || null,
-        sentiment: getSentimentFromScore(analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.sentiment_score || null),
-        response: analysisResult.llm_results?.find(r => r.llm_provider === "chatgpt")?.response_text || null,
+        mentioned:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "chatgpt")
+            ?.is_mentioned || false,
+        rank:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "chatgpt")
+            ?.rank_position || null,
+        sentiment: getSentimentFromScore(
+          analysisResult.llm_results?.find((r) => r.llm_provider === "chatgpt")
+            ?.sentiment_score || null
+        ),
+        response:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "chatgpt")
+            ?.response_text || null,
       },
-      color: "bg-green-500"
+      color: "bg-green-500",
     },
     {
       name: "Claude",
       data: {
-        mentioned: analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.is_mentioned || false,
-        rank: analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.rank_position || null,
-        sentiment: getSentimentFromScore(analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.sentiment_score || null),
-        response: analysisResult.llm_results?.find(r => r.llm_provider === "claude")?.response_text || null,
+        mentioned:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "claude")
+            ?.is_mentioned || false,
+        rank:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "claude")
+            ?.rank_position || null,
+        sentiment: getSentimentFromScore(
+          analysisResult.llm_results?.find((r) => r.llm_provider === "claude")
+            ?.sentiment_score || null
+        ),
+        response:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "claude")
+            ?.response_text || null,
       },
-      color: "bg-orange-500"
+      color: "bg-orange-500",
     },
     {
       name: "Gemini",
       data: {
-        mentioned: analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.is_mentioned || false,
-        rank: analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.rank_position || null,
-        sentiment: getSentimentFromScore(analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.sentiment_score || null),
-        response: analysisResult.llm_results?.find(r => r.llm_provider === "gemini")?.response_text || null,
+        mentioned:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "gemini")
+            ?.is_mentioned || false,
+        rank:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "gemini")
+            ?.rank_position || null,
+        sentiment: getSentimentFromScore(
+          analysisResult.llm_results?.find((r) => r.llm_provider === "gemini")
+            ?.sentiment_score || null
+        ),
+        response:
+          analysisResult.llm_results?.find((r) => r.llm_provider === "gemini")
+            ?.response_text || null,
       },
-      color: "bg-blue-500"
+      color: "bg-blue-500",
     },
   ];
 
@@ -283,15 +311,21 @@ export function DetailedAnalysisModal({
           </DialogTitle>
           <DialogDescription className="text-base">
             Analysis for:{" "}
-            <span className="font-medium">"{analysisResult.prompt || 'Unknown Prompt'}"</span>
+            <span className="font-medium">
+              "{analysisResult.prompt || "Unknown Prompt"}"
+            </span>
           </DialogDescription>
           <div className="flex items-center space-x-3">
-            <Badge variant="outline">{analysisResult.topic || 'Unknown Topic'}</Badge>
+            <Badge variant="outline">
+              {analysisResult.topic || "Unknown Topic"}
+            </Badge>
             <Badge variant="outline">
               Confidence: {analysisResult.confidence || 0}%
             </Badge>
             <span className="text-sm text-muted-foreground">
-              {analysisResult.created_at ? new Date(analysisResult.created_at).toLocaleString() : 'Date unknown'}
+              {analysisResult.created_at
+                ? new Date(analysisResult.created_at).toLocaleString()
+                : "Date unknown"}
             </span>
           </div>
         </DialogHeader>
@@ -401,8 +435,8 @@ export function DetailedAnalysisModal({
                     <div className="space-y-3">
                       <div className="p-4 bg-muted/50 rounded-lg">
                         {llm.data.response ? (
-                          <MarkdownRenderer 
-                            content={llm.data.response} 
+                          <MarkdownRenderer
+                            content={llm.data.response}
                             className="text-sm"
                           />
                         ) : (
@@ -434,7 +468,8 @@ export function DetailedAnalysisModal({
                           size="sm"
                           onClick={() =>
                             copyToClipboard(
-                              llm.data.response || "No response available for this analysis."
+                              llm.data.response ||
+                                "No response available for this analysis."
                             )
                           }
                         >
@@ -454,19 +489,46 @@ export function DetailedAnalysisModal({
                     <Lightbulb className="h-5 w-5" />
                     <span>AI-Generated Insights</span>
                   </CardTitle>
-                  <CardDescription>
-                    {insights.summary}
-                  </CardDescription>
-                  <div className="text-xs text-muted-foreground">
-                    Generated on {new Date(insights.generatedAt).toLocaleString()}
+                  <CardDescription>{insights.summary}</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">
+                      Generated on{" "}
+                      {new Date(insights.generatedAt).toLocaleString()}
+                    </div>
+                    <Badge
+                      variant={
+                        insights.sources.summary === "prompt"
+                          ? "default"
+                          : "secondary"
+                      }
+                      className="text-xs"
+                    >
+                      {insights.sources.summary === "prompt"
+                        ? "Prompt-Based"
+                        : "Calculated"}
+                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <h4 className="font-medium flex items-center space-x-2">
-                        <TrendingUp className="h-4 w-4 text-success" />
-                        <span>Strengths</span>
+                      <h4 className="font-medium flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <TrendingUp className="h-4 w-4 text-success" />
+                          <span>Strengths</span>
+                        </div>
+                        <Badge
+                          variant={
+                            insights.sources.strengths === "prompt"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {insights.sources.strengths === "prompt"
+                            ? "Prompt-Based"
+                            : "Calculated"}
+                        </Badge>
                       </h4>
                       {insights.strengths.length > 0 ? (
                         <ul className="text-sm text-muted-foreground space-y-1">
@@ -476,15 +538,30 @@ export function DetailedAnalysisModal({
                         </ul>
                       ) : (
                         <p className="text-sm text-muted-foreground">
-                          No specific strengths identified from current analysis.
+                          No specific strengths identified from current
+                          analysis.
                         </p>
                       )}
                     </div>
 
                     <div className="space-y-2">
-                      <h4 className="font-medium flex items-center space-x-2">
-                        <Target className="h-4 w-4 text-warning" />
-                        <span>Opportunities</span>
+                      <h4 className="font-medium flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Target className="h-4 w-4 text-warning" />
+                          <span>Opportunities</span>
+                        </div>
+                        <Badge
+                          variant={
+                            insights.sources.opportunities === "prompt"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {insights.sources.opportunities === "prompt"
+                            ? "Prompt-Based"
+                            : "Calculated"}
+                        </Badge>
                       </h4>
                       {insights.opportunities.length > 0 ? (
                         <ul className="text-sm text-muted-foreground space-y-1">
@@ -494,7 +571,8 @@ export function DetailedAnalysisModal({
                         </ul>
                       ) : (
                         <p className="text-sm text-muted-foreground">
-                          No specific opportunities identified from current analysis.
+                          No specific opportunities identified from current
+                          analysis.
                         </p>
                       )}
                     </div>
@@ -503,25 +581,47 @@ export function DetailedAnalysisModal({
                   <Separator />
 
                   <div className="space-y-2">
-                    <h4 className="font-medium flex items-center space-x-2">
-                      <TrendingDown className="h-4 w-4 text-blue-500" />
-                      <span>Recommendations</span>
+                    <h4 className="font-medium flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <TrendingDown className="h-4 w-4 text-blue-500" />
+                        <span>Recommendations</span>
+                      </div>
+                      <Badge
+                        variant={
+                          insights.sources.recommendations === "prompt"
+                            ? "default"
+                            : "secondary"
+                        }
+                        className="text-xs"
+                      >
+                        {insights.sources.recommendations === "prompt"
+                          ? "Prompt-Based"
+                          : "Calculated"}
+                      </Badge>
                     </h4>
                     {insights.recommendations.length > 0 ? (
                       <div className="text-sm text-muted-foreground space-y-2">
-                        {insights.recommendations.map((recommendation, index) => (
-                          <div key={index} className="flex items-start space-x-2">
-                            <span className="text-blue-500 font-medium">•</span>
-                            <MarkdownRenderer 
-                              content={recommendation} 
-                              className="text-sm flex-1"
-                            />
-                          </div>
-                        ))}
+                        {insights.recommendations.map(
+                          (recommendation, index) => (
+                            <div
+                              key={index}
+                              className="flex items-start space-x-2"
+                            >
+                              <span className="text-blue-500 font-medium">
+                                •
+                              </span>
+                              <MarkdownRenderer
+                                content={recommendation}
+                                className="text-sm flex-1"
+                              />
+                            </div>
+                          )
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Continue monitoring performance and gather more data for specific recommendations.
+                        Continue monitoring performance and gather more data for
+                        specific recommendations.
                       </p>
                     )}
                   </div>
@@ -565,7 +665,9 @@ export function DetailedAnalysisModal({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => copyToClipboard(analysisResult.prompt || 'No prompt available')}
+              onClick={() =>
+                copyToClipboard(analysisResult.prompt || "No prompt available")
+              }
             >
               <Copy className="h-4 w-4 mr-2" />
               Copy Prompt
