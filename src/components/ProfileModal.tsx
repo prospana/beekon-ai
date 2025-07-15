@@ -11,13 +11,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { FileDropZone } from "@/components/ui/file-drop-zone";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { profileService } from "@/services/profileService";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -39,26 +41,78 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      firstName: "John",
-      lastName: "Doe",
+      firstName: "",
+      lastName: "",
       email: user?.email || "",
-      company: "Beekon.ai",
-      jobTitle: "Marketing Manager",
-      phone: "+1 (555) 123-4567",
+      company: "",
+      jobTitle: "",
+      phone: "",
     },
   });
 
+  // Load profile data when modal opens
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      loadProfileData();
+    }
+  }, [isOpen, user?.id]);
+
+  const loadProfileData = async () => {
+    if (!user?.id) return;
+
+    setIsLoadingProfile(true);
+    try {
+      const profile = await profileService.getProfile(user.id);
+      
+      // Reset form with profile data
+      form.reset({
+        firstName: profile.first_name || "",
+        lastName: profile.last_name || "",
+        email: user.email || "",
+        company: profile.company || "",
+        jobTitle: profile.job_title || "",
+        phone: profile.phone || "",
+      });
+
+      // Set avatar URL for display
+      setCurrentAvatarUrl(profile.avatar_url);
+      setAvatarPreview(null); // Clear any preview when loading real data
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load profile data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
   const onSubmit = async (data: ProfileFormData) => {
+    if (!user?.id) return;
+
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Update profile using real ProfileService
+      await profileService.updateProfile(user.id, {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        company: data.company || null,
+        job_title: data.jobTitle || null,
+        phone: data.phone || null,
+      });
 
       toast({
         title: "Profile updated",
@@ -67,6 +121,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       onClose();
     } catch (error) {
+      console.error("Failed to update profile:", error);
       toast({
         title: "Error",
         description: "Failed to update profile. Please try again.",
@@ -77,30 +132,96 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     }
   };
 
-  const handleAvatarUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    setUploadError(null);
+    setUploadSuccess(false);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => setAvatarPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!user?.id) return;
+
+    setIsAvatarUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 100);
+
+      // Upload avatar using real ProfileService
+      const avatarUrl = await profileService.uploadAvatar(user.id, file);
+      
+      // Complete progress
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      // Update current avatar URL
+      setCurrentAvatarUrl(avatarUrl);
+      setAvatarPreview(null);
+      setSelectedFile(null);
+      setUploadSuccess(true);
+      
+      toast({
+        title: "Avatar updated",
+        description: "Your profile picture has been updated.",
+      });
+
+      // Clear success state after delay
+      setTimeout(() => {
+        setUploadSuccess(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to upload avatar:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload avatar. Please try again.";
+      setUploadError(errorMessage);
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAvatarUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    if (!user?.id || !currentAvatarUrl) return;
 
     setIsAvatarUploading(true);
     try {
-      // Simulate file upload
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-        toast({
-          title: "Avatar updated",
-          description: "Your profile picture has been updated.",
-        });
-      };
-      reader.readAsDataURL(file);
+      // Delete avatar using real ProfileService
+      await profileService.deleteAvatar(user.id, currentAvatarUrl);
+      
+      // Clear avatar state
+      setCurrentAvatarUrl(null);
+      setAvatarPreview(null);
+      
+      toast({
+        title: "Avatar removed",
+        description: "Your profile picture has been removed.",
+      });
     } catch (error) {
+      console.error("Failed to delete avatar:", error);
       toast({
         title: "Error",
-        description: "Failed to upload avatar. Please try again.",
+        description: "Failed to remove avatar. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -127,44 +248,85 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {isLoadingProfile ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-sm text-muted-foreground">Loading profile...</p>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Avatar Section */}
-          <div className="flex items-center space-x-4">
-            <Avatar className="h-20 w-20">
-              {avatarPreview ? (
-                <AvatarImage src={avatarPreview} alt="Profile" />
-              ) : (
-                <AvatarFallback className="text-lg">
-                  {getInitials()}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <div className="space-y-2">
-              <Label htmlFor="avatar">Profile Picture</Label>
-              <div className="flex gap-3">
+          <div className="space-y-4">
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-20 w-20">
+                {avatarPreview ? (
+                  <AvatarImage src={avatarPreview} alt="Profile preview" />
+                ) : currentAvatarUrl ? (
+                  <AvatarImage src={currentAvatarUrl} alt="Profile" />
+                ) : (
+                  <AvatarFallback className="text-lg">
+                    {getInitials()}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className="flex-1">
+                <Label className="text-base font-medium">Profile Picture</Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upload a profile picture to personalize your account
+                </p>
+                {currentAvatarUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAvatarDelete}
+                    disabled={isAvatarUploading}
+                    className="mt-2"
+                  >
+                    Remove Current Avatar
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            <FileDropZone
+              onFileSelect={handleFileSelect}
+              acceptedTypes={['image/*']}
+              maxSize={2 * 1024 * 1024} // 2MB
+              variant="avatar"
+              isUploading={isAvatarUploading}
+              uploadProgress={uploadProgress}
+              error={uploadError}
+              success={uploadSuccess}
+              disabled={isAvatarUploading}
+              placeholder="Click to upload or drag and drop your profile picture"
+            />
+            
+            {selectedFile && !isAvatarUploading && !uploadSuccess && (
+              <div className="flex gap-2">
                 <LoadingButton
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  loading={isAvatarUploading}
-                  loadingText="Uploading..."
-                  icon={<Camera className="h-4 w-4" />}
-                  onClick={() => document.getElementById("avatar")?.click()}
+                  onClick={() => handleAvatarUpload(selectedFile)}
+                  disabled={isAvatarUploading}
+                  className="flex-1"
                 >
-                  Upload
+                  Upload Avatar
                 </LoadingButton>
-                <input
-                  id="avatar"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setAvatarPreview(null);
+                    setUploadError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                JPG, PNG or GIF (max 2MB)
-              </p>
-            </div>
+            )}
           </div>
 
           {/* Form Fields */}
@@ -259,6 +421,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             </LoadingButton>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );
