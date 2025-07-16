@@ -71,9 +71,9 @@ export default function Competitors() {
     sortOrder: "desc",
   });
 
-  // Prepare chart data from analytics
-  const shareOfVoiceData =
-    analytics?.marketShareData.map((item) => ({
+  // Prepare chart data from analytics (memoized to prevent unnecessary recalculations)
+  const shareOfVoiceData = useMemo(() => {
+    return analytics?.marketShareData.map((item) => ({
       name: item.name,
       value: item.value,
       fill:
@@ -83,9 +83,10 @@ export default function Competitors() {
           ? `hsl(var(--chart-${(item.competitorId.length % 4) + 2}))`
           : "hsl(var(--muted))",
     })) || [];
+  }, [analytics?.marketShareData]);
 
-  const competitiveGapData =
-    analytics?.competitiveGaps.map((gap) => {
+  const competitiveGapData = useMemo(() => {
+    return analytics?.competitiveGaps.map((gap) => {
       const data: Record<string, number | string> = {
         topic: gap.topic,
         yourBrand: gap.yourBrand,
@@ -95,6 +96,7 @@ export default function Competitors() {
       });
       return data;
     }) || [];
+  }, [analytics?.competitiveGaps]);
 
   const handleAddCompetitor = async () => {
     if (!competitorDomain.trim()) {

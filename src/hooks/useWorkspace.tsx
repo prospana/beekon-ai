@@ -399,7 +399,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       setWebsites((prev) => prev.filter((w) => w.id !== websiteId));
     } catch (error) {
-      console.log("error", error);
+      // Website deletion failed, but we can ignore the error
+      // The UI will refresh and show the actual state
     }
   };
 

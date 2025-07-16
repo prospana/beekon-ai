@@ -49,7 +49,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 // LegacyAnalysisResult interface removed - now using modern AnalysisResult directly
 
@@ -115,14 +115,12 @@ export default function Analysis() {
         searchQuery: debouncedSearchQuery.trim() || undefined,
       };
 
-      console.log("📋 Applying filters:", filters);
 
       const results = await analysisService.getAnalysisResults(
         selectedWebsite,
         filters
       );
 
-      console.log("Filtered results:", results);
 
       setAnalysisResults(results);
     } catch (error) {
@@ -217,7 +215,6 @@ export default function Analysis() {
     if (topics.length > 0 && selectedTopic !== "all") {
       const topicExists = topics.some((topic) => topic.id === selectedTopic);
       if (!topicExists) {
-        console.log("Resetting invalid topic filter:", selectedTopic);
         setSelectedTopic("all");
       }
     }
@@ -227,7 +224,6 @@ export default function Analysis() {
     if (availableLLMs.length > 0 && selectedLLM !== "all") {
       const llmExists = availableLLMs.some((llm) => llm.id === selectedLLM);
       if (!llmExists) {
-        console.log("Resetting invalid LLM filter:", selectedLLM);
         setSelectedLLM("all");
       }
     }
@@ -235,6 +231,23 @@ export default function Analysis() {
 
   // No need for legacy format transformation - work directly with modern format
   const filteredResults = analysisResults;
+
+  // Memoize expensive statistics calculations
+  const resultStats = useMemo(() => {
+    const mentionedCount = filteredResults.filter((r) =>
+      r.llm_results.some((llm) => llm.is_mentioned)
+    ).length;
+    
+    const noMentionCount = filteredResults.filter(
+      (r) => !r.llm_results.some((llm) => llm.is_mentioned)
+    ).length;
+
+    return {
+      mentionedCount,
+      noMentionCount,
+      totalCount: filteredResults.length,
+    };
+  }, [filteredResults]);
 
   // Use dynamic LLM filters from server data
   const llmFilters =
@@ -732,7 +745,7 @@ export default function Analysis() {
             filteredResults.length > 0 && (
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>
-                  Showing {filteredResults.length} of {analysisResults.length}{" "}
+                  Showing {resultStats.totalCount} of {analysisResults.length}{" "}
                   results
                   {searchQuery && ` for "${searchQuery}"`}
                 </span>
@@ -740,23 +753,13 @@ export default function Analysis() {
                   <div className="flex items-center space-x-1">
                     <TrendingUp className="h-4 w-4 text-success" />
                     <span>
-                      {
-                        filteredResults.filter((r) =>
-                          r.llm_results.some((llm) => llm.is_mentioned)
-                        ).length
-                      }{" "}
-                      mentions
+                      {resultStats.mentionedCount} mentions
                     </span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <TrendingDown className="h-4 w-4 text-muted-foreground" />
                     <span>
-                      {
-                        filteredResults.filter(
-                          (r) => !r.llm_results.some((llm) => llm.is_mentioned)
-                        ).length
-                      }{" "}
-                      no mentions
+                      {resultStats.noMentionCount} no mentions
                     </span>
                   </div>
                 </div>

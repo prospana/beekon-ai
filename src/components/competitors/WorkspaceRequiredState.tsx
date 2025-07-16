@@ -2,7 +2,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Building, Globe, ExternalLink, Plus } from 'lucide-react';
 
 interface WorkspaceRequiredStateProps {
-  currentWorkspace: any;
+  currentWorkspace: { id: string; name: string } | null;
   websiteId: string | undefined;
 }
 

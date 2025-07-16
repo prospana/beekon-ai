@@ -342,7 +342,6 @@ export class AnalysisService {
         .replace(/[%_\\]/g, "\\$&") // Escape SQL wildcards and backslashes
         .replace(/'/g, "''"); // Escape single quotes for SQL
 
-      console.log("Applying search filter:", searchTerm);
 
       // Use correct Supabase OR query syntax with proper join paths
       query = query.or(

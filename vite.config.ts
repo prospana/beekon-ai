@@ -62,6 +62,29 @@ export default defineConfig(({ mode }) => {
             forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
             supabase: ['@supabase/supabase-js'],
             icons: ['lucide-react'],
+            charts: ['recharts'],
+          },
+          // Split route chunks by functionality
+          chunkFileNames: (chunkInfo) => {
+            const facadeModuleId = chunkInfo.facadeModuleId;
+            if (facadeModuleId) {
+              if (facadeModuleId.includes('pages/Analysis')) {
+                return 'chunks/analysis-[hash].js';
+              }
+              if (facadeModuleId.includes('pages/Competitors')) {
+                return 'chunks/competitors-[hash].js';
+              }
+              if (facadeModuleId.includes('pages/Dashboard')) {
+                return 'chunks/dashboard-[hash].js';
+              }
+              if (facadeModuleId.includes('pages/Settings')) {
+                return 'chunks/settings-[hash].js';
+              }
+              if (facadeModuleId.includes('pages/Websites')) {
+                return 'chunks/websites-[hash].js';
+              }
+            }
+            return 'chunks/[name]-[hash].js';
           },
         },
       },

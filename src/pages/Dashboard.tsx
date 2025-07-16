@@ -88,7 +88,7 @@ export default function Dashboard() {
     clearError,
   } = useDashboardMetrics(filters);
 
-  const websiteIds = websites?.map((w) => w.id) || [];
+  const websiteIds = useMemo(() => websites?.map((w) => w.id) || [], [websites]);
 
   const getSentimentColor = (sentiment: number) => {
     if (sentiment >= 60) return "bg-success";

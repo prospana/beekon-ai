@@ -55,7 +55,7 @@ export interface CompetitorAnalytics {
 export class OptimizedCompetitorService extends BaseService {
   private static instance: OptimizedCompetitorService;
   protected serviceName = 'competitor' as const;
-  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
 
   public static getInstance(): OptimizedCompetitorService {
     if (!OptimizedCompetitorService.instance) {
@@ -150,7 +150,7 @@ export class OptimizedCompetitorService extends BaseService {
       if (error) throw error;
 
       // Transform database results to match interface with safe calculations
-      return (data || []).map((row: any) => {
+      return (data || []).map((row: Record<string, unknown>) => {
         const totalMentions = row.total_mentions || 0;
         const positiveMentions = row.positive_mentions || 0;
         const avgSentiment = row.avg_sentiment_score;
@@ -212,7 +212,7 @@ export class OptimizedCompetitorService extends BaseService {
       // Group by date
       const timeSeriesMap = new Map<string, CompetitorTimeSeriesData>();
       
-      (data || []).forEach((row: any) => {
+      (data || []).forEach((row: Record<string, unknown>) => {
         const dateStr = row.analysis_date;
         if (!timeSeriesMap.has(dateStr)) {
           timeSeriesMap.set(dateStr, {

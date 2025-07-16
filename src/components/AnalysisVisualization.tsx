@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -15,90 +16,115 @@ interface AnalysisVisualizationProps {
 }
 
 export function AnalysisVisualization({ results }: AnalysisVisualizationProps) {
-  if (results.length === 0) {
+  // Memoize expensive calculations
+  const analysisMetrics = useMemo(() => {
+    if (results.length === 0) {
+      return null;
+    }
+
+    const totalResults = results.length;
+
+    // Get all LLM results from all analysis results
+    const allLLMResults = results.flatMap((r) => r.llm_results);
+
+    const mentionedResults = results.filter((r) =>
+      r.llm_results.some((llm) => llm.is_mentioned)
+    ).length;
+    const mentionRate = (mentionedResults / totalResults) * 100;
+
+    // Calculate LLM performance using modern format
+    const llmStats = allLLMResults.reduce(
+      (stats, llmResult) => {
+        const provider = llmResult.llm_provider;
+        if (!stats[provider]) {
+          stats[provider] = {
+            mentions: 0,
+            totalRank: 0,
+            rankedMentions: 0,
+            positiveSentiment: 0,
+          };
+        }
+
+        if (llmResult.is_mentioned) {
+          stats[provider].mentions++;
+          if (llmResult.rank_position) {
+            stats[provider].totalRank += llmResult.rank_position;
+            stats[provider].rankedMentions++;
+          }
+          if (llmResult.sentiment_score && llmResult.sentiment_score > 0.1) {
+            stats[provider].positiveSentiment++;
+          }
+        }
+
+        return stats;
+      },
+      {} as Record<
+        string,
+        {
+          mentions: number;
+          totalRank: number;
+          rankedMentions: number;
+          positiveSentiment: number;
+        }
+      >
+    );
+
+    // Calculate average ranks
+    const processedLLMStats = Object.entries(llmStats).reduce(
+      (processed, [provider, stats]) => {
+        processed[provider] = {
+          mentions: stats.mentions,
+          avgRank:
+            stats.rankedMentions > 0 ? stats.totalRank / stats.rankedMentions : 0,
+          positiveSentiment: stats.positiveSentiment,
+        };
+        return processed;
+      },
+      {} as Record<
+        string,
+        {
+          mentions: number;
+          avgRank: number;
+          positiveSentiment: number;
+        }
+      >
+    );
+
+    const avgConfidence =
+      results.reduce((acc, r) => acc + r.confidence * 100, 0) / results.length;
+
+    // Topic distribution
+    const topicCounts = results.reduce((acc, r) => {
+      acc[r.topic] = (acc[r.topic] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const topTopics = Object.entries(topicCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+
+    return {
+      totalResults,
+      mentionedResults,
+      mentionRate,
+      processedLLMStats,
+      avgConfidence,
+      topTopics,
+    };
+  }, [results]);
+
+  if (!analysisMetrics) {
     return null;
   }
 
-  const totalResults = results.length;
-
-  // Get all LLM results from all analysis results
-  const allLLMResults = results.flatMap((r) => r.llm_results);
-
-  const mentionedResults = results.filter((r) =>
-    r.llm_results.some((llm) => llm.is_mentioned)
-  ).length;
-  const mentionRate = (mentionedResults / totalResults) * 100;
-
-  // Calculate LLM performance using modern format
-  const llmStats = allLLMResults.reduce(
-    (stats, llmResult) => {
-      const provider = llmResult.llm_provider;
-      if (!stats[provider]) {
-        stats[provider] = {
-          mentions: 0,
-          totalRank: 0,
-          rankedMentions: 0,
-          positiveSentiment: 0,
-        };
-      }
-
-      if (llmResult.is_mentioned) {
-        stats[provider].mentions++;
-        if (llmResult.rank_position) {
-          stats[provider].totalRank += llmResult.rank_position;
-          stats[provider].rankedMentions++;
-        }
-        if (llmResult.sentiment_score && llmResult.sentiment_score > 0.1) {
-          stats[provider].positiveSentiment++;
-        }
-      }
-
-      return stats;
-    },
-    {} as Record<
-      string,
-      {
-        mentions: number;
-        totalRank: number;
-        rankedMentions: number;
-        positiveSentiment: number;
-      }
-    >
-  );
-
-  // Calculate average ranks
-  const processedLLMStats = Object.entries(llmStats).reduce(
-    (processed, [provider, stats]) => {
-      processed[provider] = {
-        mentions: stats.mentions,
-        avgRank:
-          stats.rankedMentions > 0 ? stats.totalRank / stats.rankedMentions : 0,
-        positiveSentiment: stats.positiveSentiment,
-      };
-      return processed;
-    },
-    {} as Record<
-      string,
-      {
-        mentions: number;
-        avgRank: number;
-        positiveSentiment: number;
-      }
-    >
-  );
-
-  const avgConfidence =
-    results.reduce((acc, r) => acc + r.confidence * 100, 0) / results.length;
-
-  // Topic distribution
-  const topicCounts = results.reduce((acc, r) => {
-    acc[r.topic] = (acc[r.topic] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const topTopics = Object.entries(topicCounts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
+  const {
+    totalResults,
+    mentionedResults,
+    mentionRate,
+    processedLLMStats,
+    avgConfidence,
+    topTopics,
+  } = analysisMetrics;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">

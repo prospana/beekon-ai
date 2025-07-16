@@ -100,8 +100,6 @@ export class WebsiteSettingsService {
     websiteId: string,
     updates: { displayName: string; isActive: boolean }
   ) {
-    console.log("websiteId", websiteId);
-    console.log("updates", updates);
     try {
       const { data, error } = await supabase
         .schema("beekon_data")
