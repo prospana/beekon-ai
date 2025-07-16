@@ -33,7 +33,8 @@ export default function CompetitiveGapChart({
   isExporting,
   handleExportData,
 }: CompetitiveGapChartProps) {
-  if (data.length === 0) return null;
+  // Only show chart if there are competitors and meaningful data
+  if (data.length === 0 || !analytics || analytics.totalCompetitors === 0) return null;
 
   return (
     <Card>

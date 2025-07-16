@@ -36,7 +36,11 @@ export default function ShareOfVoiceChart({
   isExporting,
   handleExportData,
 }: ShareOfVoiceChartProps) {
-  if (data.length === 0) return null;
+  // Only show chart if there are competitors to compare against
+  // Don't show if only "Your Brand" data exists
+  const hasCompetitors = data.length > 1 || (data.length === 1 && data[0].name !== "Your Brand");
+  
+  if (!hasCompetitors) return null;
 
   return (
     <Card>
