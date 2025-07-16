@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Competitor, CompetitorInsert, CompetitorUpdate, AnalysisResult, LLMResult } from "@/types/database";
 import BaseService from "./baseService";
+import { 
+  competitorAnalysisService, 
+  type CompetitorShareOfVoice, 
+  type CompetitiveGapAnalysis,
+  type CompetitorInsight 
+} from "./competitorAnalysisService";
 
 export interface CompetitorPerformance {
   competitorId: string;
@@ -50,6 +56,9 @@ export interface CompetitorAnalytics {
   }>;
   competitiveGaps: CompetitorComparison[];
   timeSeriesData: CompetitorTimeSeriesData[];
+  shareOfVoice: CompetitorShareOfVoice[];
+  gapAnalysis: CompetitiveGapAnalysis[];
+  insights: CompetitorInsight[];
 }
 
 export class OptimizedCompetitorService extends BaseService {
@@ -275,33 +284,46 @@ export class OptimizedCompetitorService extends BaseService {
           ],
           competitiveGaps: [],
           timeSeriesData: [],
+          shareOfVoice: [],
+          gapAnalysis: [],
+          insights: [],
         };
       }
 
       // Execute all queries in parallel
-      const [competitors, yourBrandResults, timeSeriesData] = await Promise.all([
+      const [
+        competitors, 
+        yourBrandResults, 
+        timeSeriesData,
+        shareOfVoice,
+        gapAnalysis,
+        insights
+      ] = await Promise.all([
         this.getCompetitorPerformance(websiteId, dateRange),
         this.getAnalysisResultsForWebsite(websiteId, dateRange),
-        this.getCompetitorTimeSeriesData(websiteId, undefined, 30)
+        this.getCompetitorTimeSeriesData(websiteId, undefined, 30),
+        competitorAnalysisService.getCompetitorShareOfVoice(websiteId, dateRange),
+        competitorAnalysisService.getCompetitiveGapAnalysis(websiteId, dateRange),
+        competitorAnalysisService.getCompetitorInsights(websiteId, dateRange)
       ]);
 
       // Calculate your brand's metrics efficiently
       const yourBrandMetrics = this.calculateBrandMetrics(yourBrandResults);
 
-      // Generate market share data
+      // Generate market share data using real competitor data
       const marketShareData = [
         {
           name: "Your Brand",
           value: yourBrandMetrics.overallVisibilityScore,
         },
-        ...competitors.map((comp) => ({
-          name: comp.name,
+        ...shareOfVoice.map((comp) => ({
+          name: comp.competitorName,
           value: comp.shareOfVoice,
           competitorId: comp.competitorId,
         })),
       ];
 
-      // Generate competitive gap analysis
+      // Generate competitive gap analysis (legacy format for compatibility)
       const competitiveGaps = this.calculateCompetitiveGaps(
         competitors,
         yourBrandResults
@@ -316,6 +338,9 @@ export class OptimizedCompetitorService extends BaseService {
         marketShareData,
         competitiveGaps,
         timeSeriesData,
+        shareOfVoice,
+        gapAnalysis,
+        insights,
       };
     });
   }
@@ -669,6 +694,99 @@ export class OptimizedCompetitorService extends BaseService {
     });
 
     return Array.from(resultsMap.values());
+  }
+
+  /**
+   * Trigger competitor analysis for new LLM responses
+   */
+  async analyzeCompetitorsInResponse(
+    websiteId: string,
+    promptId: string,
+    llmProvider: string,
+    responseText: string
+  ): Promise<void> {
+    try {
+      // Get all active competitors for this website
+      const competitors = await this.getCompetitors(websiteId);
+      
+      if (competitors.length === 0) {
+        return; // No competitors to analyze
+      }
+
+      // Create response map for batch analysis
+      const responseTextMap = new Map<string, string>();
+      responseTextMap.set(promptId, responseText);
+
+      // Analyze all competitors for this response
+      await competitorAnalysisService.batchAnalyzeCompetitors(
+        websiteId,
+        competitors.map(c => c.id),
+        [promptId],
+        llmProvider,
+        responseTextMap
+      );
+
+      // Clear cache to ensure fresh data on next request
+      this.clearCache();
+    } catch (error) {
+      console.error('Error analyzing competitors in response:', error);
+      // Don't throw - this is a background operation
+    }
+  }
+
+  /**
+   * Get enhanced share of voice data
+   */
+  async getEnhancedShareOfVoice(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<CompetitorShareOfVoice[]> {
+    const cacheKey = `enhanced_sov_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      return competitorAnalysisService.getCompetitorShareOfVoice(websiteId, dateRange);
+    });
+  }
+
+  /**
+   * Get enhanced competitive gap analysis
+   */
+  async getEnhancedCompetitiveGaps(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<CompetitiveGapAnalysis[]> {
+    const cacheKey = `enhanced_gaps_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      return competitorAnalysisService.getCompetitiveGapAnalysis(websiteId, dateRange);
+    });
+  }
+
+  /**
+   * Get competitor insights
+   */
+  async getCompetitorInsights(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<CompetitorInsight[]> {
+    const cacheKey = `insights_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      return competitorAnalysisService.getCompetitorInsights(websiteId, dateRange);
+    });
+  }
+
+  /**
+   * Refresh all competitor analysis data
+   */
+  async refreshCompetitorAnalysis(): Promise<void> {
+    try {
+      await competitorAnalysisService.refreshCompetitorAnalysisViews();
+      this.clearCache(); // Clear all cached data
+    } catch (error) {
+      console.error('Error refreshing competitor analysis:', error);
+      throw error;
+    }
   }
 }
 

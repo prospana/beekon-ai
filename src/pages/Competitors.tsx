@@ -13,6 +13,7 @@ import CompetitiveGapChart from "@/components/competitors/CompetitiveGapChart";
 import TimeSeriesChart from "@/components/competitors/TimeSeriesChart";
 import CompetitorsEmptyState from "@/components/competitors/CompetitorsEmptyState";
 import NoAnalyticsState from "@/components/competitors/NoAnalyticsState";
+import CompetitorInsights from "@/components/competitors/CompetitorInsights";
 
 export default function Competitors() {
   const {
@@ -97,6 +98,11 @@ export default function Competitors() {
       return data;
     }) || [];
   }, [analytics?.competitiveGaps]);
+
+  // Competitor insights refresh handler
+  const handleInsightsRefresh = () => {
+    refreshData();
+  };
 
   const handleAddCompetitor = async () => {
     if (!competitorDomain.trim()) {
@@ -244,9 +250,17 @@ export default function Competitors() {
         <CompetitiveGapChart
           data={competitiveGapData}
           analytics={analytics}
+          gapAnalysis={analytics?.gapAnalysis || []}
           dateFilter={dateFilter}
           isExporting={isExporting}
           handleExportData={handleExportData}
+        />
+
+        {/* Competitive Intelligence */}
+        <CompetitorInsights
+          insights={analytics?.insights || []}
+          isLoading={isLoading}
+          onRefresh={handleInsightsRefresh}
         />
 
         {/* Time Series Chart */}
