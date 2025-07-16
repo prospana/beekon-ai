@@ -23,7 +23,8 @@
       "Bash(node:*)",
       "Bash(npm:*)",
       "Bash(npx rimraf:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }
