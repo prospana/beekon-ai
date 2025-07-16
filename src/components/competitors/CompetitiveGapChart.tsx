@@ -1,15 +1,29 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Download } from 'lucide-react';
-import { CompetitorAnalytics } from '@/services/competitorService';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { Download } from "lucide-react";
+import { CompetitorAnalytics } from "@/services/competitorService";
 
 interface CompetitiveGapChartProps {
   data: Array<Record<string, number | string>>;
   analytics: CompetitorAnalytics | null;
-  dateFilter: '7d' | '30d' | '90d';
+  dateFilter: "7d" | "30d" | "90d";
   isExporting: boolean;
-  handleExportData: (format: 'json') => void;
+  handleExportData: (format: "json") => void;
 }
 
 export default function CompetitiveGapChart({
@@ -28,13 +42,14 @@ export default function CompetitiveGapChart({
           <div>
             <CardTitle>Competitive Gap Analysis</CardTitle>
             <CardDescription>
-              Topic-by-topic comparison with your competitors (last {dateFilter})
+              Topic-by-topic comparison with your competitors (last {dateFilter}
+              )
             </CardDescription>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleExportData('json')}
+            onClick={() => handleExportData("json")}
             disabled={isExporting}
           >
             <Download className="h-4 w-4 mr-2" />
@@ -48,14 +63,19 @@ export default function CompetitiveGapChart({
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="topic" />
             <YAxis domain={[0, 100]} />
-            <Tooltip formatter={(value) => [`${value}%`, 'Visibility Score']} />
-            <Bar dataKey="yourBrand" name="Your Brand" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Tooltip formatter={(value) => [`${value}%`, "Visibility Score"]} />
+            <Bar
+              dataKey="yourBrand"
+              name="Your Brand"
+              fill="hsl(var(--primary))"
+              radius={[4, 4, 0, 0]}
+            />
             {analytics?.competitiveGaps[0]?.competitors.map((comp, index) => (
-              <Bar 
+              <Bar
                 key={comp.competitorId}
-                dataKey={`competitor${index + 1}`} 
-                name={comp.name} 
-                fill={`hsl(var(--chart-${index + 2}))`} 
+                dataKey={`competitor${index + 1}`}
+                name={comp.name}
+                fill={`hsl(var(--chart-${index + 2}))`}
                 radius={[4, 4, 0, 0]}
               />
             ))}

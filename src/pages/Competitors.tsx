@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { useCompetitors } from "@/hooks/useCompetitors";
@@ -40,8 +40,8 @@ export default function Competitors() {
   // Get first website ID for competitor tracking
   const websiteId = websites?.[0]?.id;
 
-  // Calculate date range
-  const dateRange = (() => {
+  // Calculate date range (memoized to prevent infinite re-renders)
+  const dateRange = useMemo(() => {
     const end = new Date();
     const start = new Date();
     const days = dateFilter === "7d" ? 7 : dateFilter === "30d" ? 30 : 90;
@@ -50,7 +50,7 @@ export default function Competitors() {
       start: start.toISOString(),
       end: end.toISOString(),
     };
-  })();
+  }, [dateFilter]);
 
   // Use competitors hook with filters
   const {

@@ -1,7 +1,21 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Download } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { Download } from "lucide-react";
 
 interface ShareOfVoiceData {
   name: string;
@@ -11,9 +25,9 @@ interface ShareOfVoiceData {
 
 interface ShareOfVoiceChartProps {
   data: ShareOfVoiceData[];
-  dateFilter: '7d' | '30d' | '90d';
+  dateFilter: "7d" | "30d" | "90d";
   isExporting: boolean;
-  handleExportData: (format: 'pdf') => void;
+  handleExportData: (format: "pdf") => void;
 }
 
 export default function ShareOfVoiceChart({
@@ -31,13 +45,14 @@ export default function ShareOfVoiceChart({
           <div>
             <CardTitle>Share of Voice Comparison</CardTitle>
             <CardDescription>
-              How your brand compares to competitors in AI responses (last {dateFilter})
+              How your brand compares to competitors in AI responses (last{" "}
+              {dateFilter})
             </CardDescription>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleExportData('pdf')}
+            onClick={() => handleExportData("pdf")}
             disabled={isExporting}
           >
             <Download className="h-4 w-4 mr-2" />
@@ -51,7 +66,7 @@ export default function ShareOfVoiceChart({
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" domain={[0, 100]} />
             <YAxis dataKey="name" type="category" width={120} />
-            <Tooltip formatter={(value) => [`${value}%`, 'Share of Voice']} />
+            <Tooltip formatter={(value) => [`${value}%`, "Share of Voice"]} />
             <Bar dataKey="value" radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
