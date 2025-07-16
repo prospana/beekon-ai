@@ -42,15 +42,15 @@ export function FileDropZone({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const formatFileSize = (bytes: number): string => {
+  const formatFileSize = useCallback((bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  }, []);
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = useCallback((file: File): string | null => {
     if (maxSize && file.size > maxSize) {
       return `File size (${formatFileSize(file.size)}) exceeds maximum limit of ${formatFileSize(maxSize)}`;
     }
@@ -69,7 +69,7 @@ export function FileDropZone({
     }
 
     return null;
-  };
+  }, [formatFileSize, maxSize, acceptedTypes]);
 
   const handleFileSelect = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -91,7 +91,7 @@ export function FileDropZone({
       reader.onload = (e) => setPreview(e.target?.result as string);
       reader.readAsDataURL(file);
     }
-  }, [onFileSelect, showPreview, maxSize, acceptedTypes]);
+  }, [onFileSelect, showPreview, validateFile]);  
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

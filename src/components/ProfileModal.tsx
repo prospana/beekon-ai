@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, User } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { profileService } from "@/services/profileService";
@@ -63,19 +63,13 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   });
 
   // Load profile data when modal opens
-  useEffect(() => {
-    if (isOpen && user?.id) {
-      loadProfileData();
-    }
-  }, [isOpen, user?.id]);
-
-  const loadProfileData = async () => {
+  const loadProfileData = useCallback(async () => {
     if (!user?.id) return;
 
     setIsLoadingProfile(true);
     try {
       const profile = await profileService.getProfile(user.id);
-      
+
       // Reset form with profile data
       form.reset({
         firstName: profile.first_name || "",
@@ -98,7 +92,13 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     } finally {
       setIsLoadingProfile(false);
     }
-  };
+  }, [user?.id, user?.email, form, setCurrentAvatarUrl, toast]);
+
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      loadProfileData();
+    }
+  }, [isOpen, user?.id, loadProfileData]);
 
   const onSubmit = async (data: ProfileFormData) => {
     if (!user?.id) return;
@@ -136,7 +136,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     setSelectedFile(file);
     setUploadError(null);
     setUploadSuccess(false);
-    
+
     // Create preview
     const reader = new FileReader();
     reader.onload = (e) => setAvatarPreview(e.target?.result as string);
@@ -165,17 +165,17 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       // Upload avatar using real ProfileService
       const avatarUrl = await profileService.uploadAvatar(user.id, file);
-      
+
       // Complete progress
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
+
       // Update current avatar URL
       setCurrentAvatarUrl(avatarUrl);
       setAvatarPreview(null);
       setSelectedFile(null);
       setUploadSuccess(true);
-      
+
       toast({
         title: "Avatar updated",
         description: "Your profile picture has been updated.",
@@ -187,9 +187,12 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       }, 2000);
     } catch (error) {
       console.error("Failed to upload avatar:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to upload avatar. Please try again.";
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to upload avatar. Please try again.";
       setUploadError(errorMessage);
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -208,11 +211,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     try {
       // Delete avatar using real ProfileService
       await profileService.deleteAvatar(user.id, currentAvatarUrl);
-      
+
       // Clear avatar state
       setCurrentAvatarUrl(null);
       setAvatarPreview(null);
-      
+
       toast({
         title: "Avatar removed",
         description: "Your profile picture has been removed.",
@@ -252,175 +255,179 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-sm text-muted-foreground">Loading profile...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading profile...
+              </p>
             </div>
           </div>
         ) : (
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Avatar Section */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20">
-                {avatarPreview ? (
-                  <AvatarImage src={avatarPreview} alt="Profile preview" />
-                ) : currentAvatarUrl ? (
-                  <AvatarImage src={currentAvatarUrl} alt="Profile" />
-                ) : (
-                  <AvatarFallback className="text-lg">
-                    {getInitials()}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div className="flex-1">
-                <Label className="text-base font-medium">Profile Picture</Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Upload a profile picture to personalize your account
-                </p>
-                {currentAvatarUrl && (
+            {/* Avatar Section */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-20 w-20">
+                  {avatarPreview ? (
+                    <AvatarImage src={avatarPreview} alt="Profile preview" />
+                  ) : currentAvatarUrl ? (
+                    <AvatarImage src={currentAvatarUrl} alt="Profile" />
+                  ) : (
+                    <AvatarFallback className="text-lg">
+                      {getInitials()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <div className="flex-1">
+                  <Label className="text-base font-medium">
+                    Profile Picture
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Upload a profile picture to personalize your account
+                  </p>
+                  {currentAvatarUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAvatarDelete}
+                      disabled={isAvatarUploading}
+                      className="mt-2"
+                    >
+                      Remove Current Avatar
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <FileDropZone
+                onFileSelect={handleFileSelect}
+                acceptedTypes={["image/*"]}
+                maxSize={2 * 1024 * 1024} // 2MB
+                variant="avatar"
+                isUploading={isAvatarUploading}
+                uploadProgress={uploadProgress}
+                error={uploadError}
+                success={uploadSuccess}
+                disabled={isAvatarUploading}
+                placeholder="Click to upload or drag and drop your profile picture"
+              />
+
+              {selectedFile && !isAvatarUploading && !uploadSuccess && (
+                <div className="flex gap-2">
+                  <LoadingButton
+                    type="button"
+                    onClick={() => handleAvatarUpload(selectedFile)}
+                    disabled={isAvatarUploading}
+                    className="flex-1"
+                  >
+                    Upload Avatar
+                  </LoadingButton>
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    onClick={handleAvatarDelete}
-                    disabled={isAvatarUploading}
-                    className="mt-2"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setAvatarPreview(null);
+                      setUploadError(null);
+                    }}
                   >
-                    Remove Current Avatar
+                    Cancel
                   </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Form Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  {...form.register("firstName")}
+                  className="focus-ring"
+                />
+                {form.formState.errors.firstName && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.firstName.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  {...form.register("lastName")}
+                  className="focus-ring"
+                />
+                {form.formState.errors.lastName && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.lastName.message}
+                  </p>
                 )}
               </div>
             </div>
-            
-            <FileDropZone
-              onFileSelect={handleFileSelect}
-              acceptedTypes={['image/*']}
-              maxSize={2 * 1024 * 1024} // 2MB
-              variant="avatar"
-              isUploading={isAvatarUploading}
-              uploadProgress={uploadProgress}
-              error={uploadError}
-              success={uploadSuccess}
-              disabled={isAvatarUploading}
-              placeholder="Click to upload or drag and drop your profile picture"
-            />
-            
-            {selectedFile && !isAvatarUploading && !uploadSuccess && (
-              <div className="flex gap-2">
-                <LoadingButton
-                  type="button"
-                  onClick={() => handleAvatarUpload(selectedFile)}
-                  disabled={isAvatarUploading}
-                  className="flex-1"
-                >
-                  Upload Avatar
-                </LoadingButton>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedFile(null);
-                    setAvatarPreview(null);
-                    setUploadError(null);
-                  }}
-                >
-                  Cancel
-                </Button>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                {...form.register("email")}
+                disabled
+                className="bg-muted"
+              />
+              {form.formState.errors.email && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.email.message}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  {...form.register("company")}
+                  className="focus-ring"
+                />
               </div>
-            )}
-          </div>
-
-          {/* Form Fields */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                {...form.register("firstName")}
-                className="focus-ring"
-              />
-              {form.formState.errors.firstName && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.firstName.message}
-                </p>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="jobTitle">Job Title</Label>
+                <Input
+                  id="jobTitle"
+                  {...form.register("jobTitle")}
+                  className="focus-ring"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                {...form.register("lastName")}
-                className="focus-ring"
-              />
-              {form.formState.errors.lastName && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.lastName.message}
-                </p>
-              )}
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              {...form.register("email")}
-              disabled
-              className="bg-muted"
-            />
-            {form.formState.errors.email && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.email.message}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
+              <Label htmlFor="phone">Phone Number</Label>
               <Input
-                id="company"
-                {...form.register("company")}
+                id="phone"
+                {...form.register("phone")}
                 className="focus-ring"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="jobTitle">Job Title</Label>
-              <Input
-                id="jobTitle"
-                {...form.register("jobTitle")}
-                className="focus-ring"
-              />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              {...form.register("phone")}
-              className="focus-ring"
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <LoadingButton
-              type="submit"
-              loading={isLoading}
-              loadingText="Saving..."
-            >
-              Save Changes
-            </LoadingButton>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                type="submit"
+                loading={isLoading}
+                loadingText="Saving..."
+              >
+                Save Changes
+              </LoadingButton>
+            </DialogFooter>
+          </form>
         )}
       </DialogContent>
     </Dialog>
