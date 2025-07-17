@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
-import { useCompetitorData, useAddCompetitor, useDeleteCompetitor } from "@/hooks/useCompetitorsQuery";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useCompetitorData, useAddCompetitor, useDeleteCompetitor } from "@/hooks/useCompetitorsQuery";
 import CompetitorsHeader from "@/components/competitors/CompetitorsHeader";
 import CompetitorsLoadingState from "@/components/competitors/CompetitorsLoadingState";
 import WorkspaceRequiredState from "@/components/competitors/WorkspaceRequiredState";
@@ -30,11 +30,8 @@ export default function Competitors() {
   const [competitorDomain, setCompetitorDomain] = useState("");
   const [competitorName, setCompetitorName] = useState("");
   const [selectedWebsiteId, setSelectedWebsiteId] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [competitorToDelete, setCompetitorToDelete] = useState<string | null>(
-    null
-  );
+  const [competitorToDelete, setCompetitorToDelete] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<"7d" | "30d" | "90d">("30d");
   const [sortBy, setSortBy] = useState<
     "shareOfVoice" | "averageRank" | "mentionCount" | "sentimentScore"
@@ -63,7 +60,7 @@ export default function Competitors() {
     };
   }, [dateFilter]);
 
-  // Use competitors hook with filters
+  // Use React Query-based competitor data hook
   const {
     competitors,
     performance,
@@ -72,46 +69,17 @@ export default function Competitors() {
     isRefreshing,
     error,
     refetch,
-    targetWebsiteId,
-
-
     hasData,
+    targetWebsiteId,
   } = useCompetitorData(selectedWebsiteId, {
     dateRange,
     sortBy,
     sortOrder: "desc",
   });
 
-  // Compatibility layer for old function names
-  const refreshData = refetch || (() => {});
-  const clearError = () => {};
-  const deleteCompetitor = async (competitorId: string) => {
-    try {
-      const { competitorService } = await import("@/services/competitorService");
-      await competitorService.deleteCompetitor(competitorId);
-      if (refetch) refetch();
-      toast({ title: "Competitor removed", description: "Competitor has been removed from tracking." });
-    } catch (error) {
-      toast({ title: "Error removing competitor", description: "Failed to remove competitor", variant: "destructive" });
-    }
-  };
-  const exportCompetitorData = async (format: "pdf" | "csv" | "json") => {
-    try {
-      const { competitorService } = await import("@/services/competitorService");
-      const blob = await competitorService.exportCompetitorData(selectedWebsiteId, format, dateRange);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `competitors-${Date.now()}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast({ title: "Export successful", description: `Data exported as ${format.toUpperCase()}` });
-    } catch (error) {
-      toast({ title: "Export failed", description: "Failed to export data", variant: "destructive" });
-    }
-  };
+  // Use React Query mutations for proper cache invalidation
+  const addCompetitorMutation = useAddCompetitor();
+  const deleteCompetitorMutation = useDeleteCompetitor();
 
   // Prepare chart data from analytics (memoized to prevent unnecessary recalculations)
   const shareOfVoiceData = useMemo(() => {
@@ -146,7 +114,7 @@ export default function Competitors() {
 
   // Competitor insights refresh handler
   const handleInsightsRefresh = () => {
-    refreshData();
+    refetch();
   };
 
   const handleAddCompetitor = async () => {
@@ -188,16 +156,6 @@ export default function Competitors() {
       return;
     }
 
-    // Optionally warn if website is inactive (but allow it)
-    if (!selectedWebsite.is_active) {
-      toast({
-        title: "Warning",
-        description: "You're adding a competitor to an inactive website",
-        variant: "default",
-      });
-    }
-    setIsAdding(true);
-
     // Validate domain format
     const domainRegex =
       /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(\/.*)?$/i;
@@ -208,48 +166,61 @@ export default function Competitors() {
         description: "Please enter a valid domain name",
         variant: "destructive",
       });
-      setIsAdding(false);
       return;
     }
 
-    const response = await sendN8nWebhook("webhook/competitors-onboarding", {
-      website_id: selectedWebsite.id,
-      website_name: selectedWebsite.display_name,
-      website_url: selectedWebsite.domain,
-      competitors_url: addProtocol(competitorDomain),
-      display_name: competitorName,
-      workspace_id: currentWorkspace?.id,
-    });
-
-    if (!response.success) {
-      toast({
-        title: "Error",
-        description: "Failed to crawl competitor's website.",
-        variant: "destructive",
+    try {
+      // First add the competitor to the database using React Query mutation
+      await addCompetitorMutation.mutateAsync({
+        websiteId: selectedWebsite.id,
+        domain: competitorDomain,
+        name: competitorName || undefined,
       });
-      setIsAdding(false);
-      return;
+
+      // Then trigger the N8N webhook for analysis
+      const response = await sendN8nWebhook("webhook/competitors-onboarding", {
+        website_id: selectedWebsite.id,
+        website_name: selectedWebsite.display_name,
+        website_url: selectedWebsite.domain,
+        competitors_url: addProtocol(competitorDomain),
+        display_name: competitorName,
+        workspace_id: currentWorkspace?.id,
+      });
+
+      if (!response.success) {
+        toast({
+          title: "Warning",
+          description: "Competitor added but analysis webhook failed. Analysis may be delayed.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Competitor added successfully!",
+          description: `Analysis started for ${competitorDomain}`,
+        });
+      }
+
+      // Reset form
+      setCompetitorName("");
+      setCompetitorDomain("");
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      // Error is already handled by the mutation
+      console.error("Failed to add competitor:", error);
     }
-
-    // Here you would typically make an API call to add the website
-    toast({
-      title: "Competitor's Website added!",
-      description: `Competitors Analysis started for ${competitorDomain}`,
-    });
-
-    setIsAdding(false);
-    setCompetitorName("");
-    setCompetitorDomain("");
-    setIsAddDialogOpen(false);
   };
 
   const handleDeleteCompetitor = async (competitorId: string) => {
     try {
-      await deleteCompetitor(competitorId);
+      await deleteCompetitorMutation.mutateAsync({
+        competitorId,
+        websiteId: selectedWebsiteId,
+      });
       setShowDeleteConfirm(false);
       setCompetitorToDelete(null);
     } catch (error) {
-      // Error is already handled by the hook
+      // Error is already handled by the mutation
+      console.error("Failed to delete competitor:", error);
     }
   };
 
@@ -270,9 +241,35 @@ export default function Competitors() {
 
     setIsExporting(true);
     try {
-      await exportCompetitorData(format);
+      // Use the competitor service export functionality
+      const { competitorService } = await import("@/services/competitorService");
+      const blob = await competitorService.exportCompetitorData(
+        selectedWebsiteId,
+        format,
+        dateRange
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `competitors-${Date.now()}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export successful",
+        description: `Competitor data exported as ${format.toUpperCase()}`,
+      });
     } catch (error) {
-      // Error is already handled by the hook
+      console.error("Export failed:", error);
+      toast({
+        title: "Export failed",
+        description: "Failed to export competitor data. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
@@ -314,7 +311,7 @@ export default function Competitors() {
           competitorDomain={competitorDomain}
           competitorName={competitorName}
           selectedWebsiteId={selectedWebsiteId}
-          isAdding={isAdding}
+          isAdding={addCompetitorMutation.isPending}
           websites={websites || []}
           websitesLoading={workspaceLoading}
           setDateFilter={setDateFilter}
@@ -323,7 +320,7 @@ export default function Competitors() {
           setCompetitorDomain={setCompetitorDomain}
           setCompetitorName={setCompetitorName}
           setSelectedWebsiteId={setSelectedWebsiteId}
-          refreshData={refreshData}
+          refreshData={refetch}
           handleExportData={handleExportData}
           handleAddCompetitor={handleAddCompetitor}
         />
@@ -333,8 +330,8 @@ export default function Competitors() {
           <CompetitorsErrorState
             error={error}
             isRefreshing={isRefreshing}
-            refreshData={refreshData}
-            clearError={clearError}
+            refreshData={refetch}
+            clearError={() => {}} // Error will clear on successful refetch
           />
         )}
 
@@ -381,7 +378,7 @@ export default function Competitors() {
         {/* Empty Charts State */}
         {hasData && shareOfVoiceData.length === 0 && (
           <NoAnalyticsState
-            refreshData={refreshData}
+            refreshData={refetch}
             isRefreshing={isRefreshing}
           />
         )}
