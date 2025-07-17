@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAnalysisErrorHandler } from "@/hooks/useAnalysisError";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { capitalizeFirstLetters } from "@/lib/utils";
 import { analysisService, LLMResult } from "@/services/analysisService";
 import { UIAnalysisResult } from "@/types/database";
 import {
@@ -48,7 +49,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 // LegacyAnalysisResult interface removed - now using modern AnalysisResult directly
 
@@ -98,9 +99,11 @@ export default function Analysis() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load analysis results
+  // Consolidated filter management
   const loadAnalysisResults = useCallback(async () => {
-    if (!selectedWebsite) return;
+    if (!selectedWebsite) {
+      return;
+    }
 
     setIsLoadingResults(true);
     clearError();
@@ -112,14 +115,17 @@ export default function Analysis() {
         searchQuery: debouncedSearchQuery.trim() || undefined,
       };
 
+
       const results = await analysisService.getAnalysisResults(
         selectedWebsite,
         filters
       );
 
+
       setAnalysisResults(results);
     } catch (error) {
-      console.error("Failed to load analysis results:", error);
+      console.error("❌ Failed to load analysis results:", error);
+      console.error("❌ Error details:", error);
       handleError(error);
       toast({
         title: "Error",
@@ -190,11 +196,21 @@ export default function Analysis() {
   }, [selectedWebsite, handleError]);
 
   // Load data when dependencies change
+  // Consolidated filter and data management
+  useEffect(() => {
+    // Load metadata (topics and LLMs) when website changes
+    if (selectedWebsite) {
+      loadTopics();
+      loadAvailableLLMs();
+    }
+  }, [selectedWebsite, loadTopics, loadAvailableLLMs]);
+
+  // Load analysis results when filters change
   useEffect(() => {
     loadAnalysisResults();
   }, [loadAnalysisResults]);
 
-  // Filter validation - reset invalid filters when data changes
+  // Improved filter validation - only reset when necessary
   useEffect(() => {
     if (topics.length > 0 && selectedTopic !== "all") {
       const topicExists = topics.some((topic) => topic.id === selectedTopic);
@@ -213,13 +229,25 @@ export default function Analysis() {
     }
   }, [availableLLMs, selectedLLM]);
 
-  useEffect(() => {
-    loadTopics();
-    loadAvailableLLMs();
-  }, [loadTopics, loadAvailableLLMs]);
-
   // No need for legacy format transformation - work directly with modern format
   const filteredResults = analysisResults;
+
+  // Memoize expensive statistics calculations
+  const resultStats = useMemo(() => {
+    const mentionedCount = filteredResults.filter((r) =>
+      r.llm_results.some((llm) => llm.is_mentioned)
+    ).length;
+    
+    const noMentionCount = filteredResults.filter(
+      (r) => !r.llm_results.some((llm) => llm.is_mentioned)
+    ).length;
+
+    return {
+      mentionedCount,
+      noMentionCount,
+      totalCount: filteredResults.length,
+    };
+  }, [filteredResults]);
 
   // Use dynamic LLM filters from server data
   const llmFilters =
@@ -305,6 +333,16 @@ export default function Analysis() {
     setSelectedTopic("all");
     setSelectedLLM("all");
     setSearchQuery("");
+  };
+
+  const getTopicName = (id: string): string => {
+    if (!id) {
+      return "";
+    }
+
+    const index = topics.findIndex((topic) => topic.id === id);
+
+    return topics[index]!.name || "";
   };
 
   const handleRemoveFilter = (filterType: "topic" | "llm" | "search") => {
@@ -593,7 +631,10 @@ export default function Analysis() {
           {!loading && !isLoadingResults && hasActiveFilters && (
             <FilterBreadcrumbs
               filters={{
-                topic: selectedTopic !== "all" ? selectedTopic : undefined,
+                topic:
+                  selectedTopic !== "all"
+                    ? capitalizeFirstLetters(getTopicName(selectedTopic))
+                    : undefined,
                 llm: selectedLLM !== "all" ? selectedLLM : undefined,
                 search: searchQuery.trim() || undefined,
               }}
@@ -704,7 +745,7 @@ export default function Analysis() {
             filteredResults.length > 0 && (
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>
-                  Showing {filteredResults.length} of {analysisResults.length}{" "}
+                  Showing {resultStats.totalCount} of {analysisResults.length}{" "}
                   results
                   {searchQuery && ` for "${searchQuery}"`}
                 </span>
@@ -712,23 +753,13 @@ export default function Analysis() {
                   <div className="flex items-center space-x-1">
                     <TrendingUp className="h-4 w-4 text-success" />
                     <span>
-                      {
-                        filteredResults.filter((r) =>
-                          r.llm_results.some((llm) => llm.is_mentioned)
-                        ).length
-                      }{" "}
-                      mentions
+                      {resultStats.mentionedCount} mentions
                     </span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <TrendingDown className="h-4 w-4 text-muted-foreground" />
                     <span>
-                      {
-                        filteredResults.filter(
-                          (r) => !r.llm_results.some((llm) => llm.is_mentioned)
-                        ).length
-                      }{" "}
-                      no mentions
+                      {resultStats.noMentionCount} no mentions
                     </span>
                   </div>
                 </div>

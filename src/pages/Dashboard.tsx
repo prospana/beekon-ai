@@ -6,6 +6,12 @@ import {
   TopicRadarChart,
   WebsitePerformanceChart,
 } from "@/components/DashboardCharts";
+import { DashboardErrorState } from "@/components/dashboard/DashboardErrorState";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardLoadingState } from "@/components/dashboard/DashboardLoadingState";
+import { DashboardMetricsCards } from "@/components/dashboard/DashboardMetricsCards";
+import { VisibilityChart } from "@/components/dashboard/VisibilityChart";
+import { WorkspaceCreationPrompt } from "@/components/dashboard/WorkspaceCreationPrompt";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,7 +28,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { WorkspaceModal } from "@/components/WorkspaceModal";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardMetrics } from "@/hooks/useDashboard";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -83,7 +88,7 @@ export default function Dashboard() {
     clearError,
   } = useDashboardMetrics(filters);
 
-  const websiteIds = websites?.map((w) => w.id) || [];
+  const websiteIds = useMemo(() => websites?.map((w) => w.id) || [], [websites]);
 
   const getSentimentColor = (sentiment: number) => {
     if (sentiment >= 60) return "bg-success";
@@ -179,170 +184,39 @@ export default function Dashboard() {
 
   // Show loading state
   if (loading || isDashboardLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">
-              {loading ? "Loading workspace..." : "Loading dashboard data..."}
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <div className="h-4 bg-muted rounded animate-pulse" />
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 bg-muted rounded animate-pulse mb-2" />
-                <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <Card>
-          <CardHeader>
-            <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
-            <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 bg-muted rounded animate-pulse" />
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <DashboardLoadingState />;
   }
 
   // Show workspace creation prompt when no workspace exists
   if (!currentWorkspace) {
-    return (
-      <>
-        <div className="space-y-6">
-          <div className="text-center py-12">
-            <Building className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h1 className="text-3xl font-bold mb-2">Welcome to Beekon.ai</h1>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              To get started with monitoring your brand's AI visibility
-              performance, you need to create a workspace first.
-            </p>
-            <LoadingButton
-              onClick={() => setShowCreateWorkspace(true)}
-              icon={<Plus className="h-4 w-4" />}
-              size="lg"
-            >
-              Create Your First Workspace
-            </LoadingButton>
-          </div>
-        </div>
-        <WorkspaceModal
-          isOpen={showCreateWorkspace}
-          onClose={() => setShowCreateWorkspace(false)}
-        />
-      </>
-    );
+    return <WorkspaceCreationPrompt />;
   }
 
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Monitor your brand's AI visibility performance
-              <span className="ml-2">
-                • {currentWorkspace.name}
-                {currentWorkspace.credits_remaining !== null && (
-                  <span className="ml-1 text-sm">
-                    ({currentWorkspace.credits_remaining} credits remaining)
-                  </span>
-                )}
-                {metrics && (
-                  <span className="ml-1 text-sm">
-                    • {metrics.activeWebsites} websites, {metrics.totalAnalyses}{" "}
-                    analyses
-                  </span>
-                )}
-              </span>
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="flex gap-1 mr-2">
-              {["7d", "30d", "90d"].map((period) => (
-                <Button
-                  key={period}
-                  variant={dateFilter === period ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setDateFilter(period as "7d" | "30d" | "90d")}
-                  disabled={isRefreshing}
-                >
-                  {period}
-                </Button>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAllCharts(!showAllCharts)}
-              disabled={!hasData}
-            >
-              {showAllCharts ? "Hide" : "Show"} Details
-            </Button>
-            <LoadingButton
-              variant="outline"
-              size="sm"
-              loading={isRefreshing}
-              loadingText="Refreshing..."
-              onClick={refreshData}
-              icon={<RefreshCw className="h-4 w-4" />}
-            >
-              Refresh
-            </LoadingButton>
-            <LoadingButton
-              variant="outline"
-              size="sm"
-              loading={isExporting}
-              loadingText="Exporting..."
-              onClick={() => handleExportData("pdf")}
-              icon={<Download className="h-4 w-4" />}
-              disabled={!hasData}
-            >
-              Export
-            </LoadingButton>
-          </div>
-        </div>
+        <DashboardHeader
+          currentWorkspace={currentWorkspace}
+          metrics={metrics}
+          dateFilter={dateFilter}
+          setDateFilter={setDateFilter}
+          showAllCharts={showAllCharts}
+          setShowAllCharts={setShowAllCharts}
+          isRefreshing={isRefreshing}
+          isExporting={isExporting}
+          hasData={hasData}
+          refreshData={refreshData}
+          handleExportData={handleExportData}
+        />
 
         {/* Error State */}
         {dashboardError && (
-          <Card className="border-destructive/50 bg-destructive/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <AlertCircle className="h-5 w-5 text-destructive" />
-                <h3 className="font-semibold text-destructive">
-                  Error Loading Dashboard Data
-                </h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                {dashboardError.message}
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  onClick={refreshData}
-                  variant="outline"
-                  size="sm"
-                  disabled={isRefreshing}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Retry
-                </Button>
-                <Button onClick={clearError} variant="outline" size="sm">
-                  Dismiss
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <DashboardErrorState
+            error={dashboardError}
+            onRetry={refreshData}
+            onDismiss={clearError}
+            isRefreshing={isRefreshing}
+          />
         )}
 
         {/* Metrics Cards */}

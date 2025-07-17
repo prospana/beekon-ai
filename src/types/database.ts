@@ -100,6 +100,12 @@ export interface AnalysisInsights {
   recommendations: string[];
   summary: string;
   generatedAt: string;
+  sources: {
+    summary: 'prompt' | 'calculated';
+    strengths: 'prompt' | 'calculated' | 'mixed';
+    opportunities: 'prompt' | 'calculated' | 'mixed';
+    recommendations: 'prompt' | 'calculated' | 'mixed';
+  };
 }
 
 export interface AnalysisResult {
@@ -124,6 +130,10 @@ export interface UIAnalysisResult {
   confidence: number;
   created_at: string;
   updated_at: string;
+  reporting_text: string | null;
+  recommendation_text: string | null;
+  prompt_strengths: string[] | null;
+  prompt_opportunities: string[] | null;
   llm_results: UILLMResult[];
   insights?: AnalysisInsights;
 }
@@ -138,6 +148,7 @@ export interface UILLMResult {
   summary_text: string | null;
   response_text: string | null;
   analyzed_at: string;
+  isFiltered?: boolean; // Flag to indicate if this result matches the current filter
 }
 
 // Competitor analysis result

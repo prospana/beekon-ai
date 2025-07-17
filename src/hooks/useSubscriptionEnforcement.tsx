@@ -132,7 +132,6 @@ export function useSubscriptionEnforcement() {
           label: upgradeAction,
           onClick: () => {
             // Here you would typically navigate to upgrade page or open upgrade modal
-            console.log("Action clicked:", upgradeAction);
           },
         },
       });

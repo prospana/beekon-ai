@@ -1,5 +1,6 @@
 import { ApiKeyModal } from "@/components/ApiKeyModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,15 +12,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { FileDropZone } from "@/components/ui/file-drop-zone";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { ApiKey, apiKeyService } from "@/services/apiKeyService";
 import { profileService, UserProfile } from "@/services/profileService";
 import {
   AlertCircle,
   Bell,
+  Camera,
   Key,
   Loader2,
   Lock,
@@ -33,17 +37,22 @@ import { useEffect, useState } from "react";
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { profile, isLoading: isLoadingProfile, loadProfile, updateProfile, uploadAvatar, deleteAvatar, getInitials } = useProfile();
   const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [isPasswordUpdating, setIsPasswordUpdating] = useState(false);
   const [isApiModalOpen, setIsApiModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
-  // Profile state
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  // Profile form state
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Form state for password
   const [currentPassword, setCurrentPassword] = useState("");
@@ -60,9 +69,28 @@ export default function Settings() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [primaryApiKey, setPrimaryApiKey] = useState<string>("");
 
-  // Load profile data on component mount
+  // Sync form state with profile data
   useEffect(() => {
-    const loadProfile = async () => {
+    if (profile) {
+      setFirstName(profile.first_name || "");
+      setLastName(profile.last_name || "");
+      setCompany(profile.company || "");
+      setEmailNotifications(
+        profile.notification_settings.email_notifications
+      );
+      setWeeklyReports(profile.notification_settings.weekly_reports);
+      setCompetitorAlerts(
+        profile.notification_settings.competitor_alerts
+      );
+      setAnalysisComplete(
+        profile.notification_settings.analysis_complete
+      );
+    }
+  }, [profile]);
+
+  // Load API keys when user changes
+  useEffect(() => {
+    const loadApiKeys = async () => {
       if (!user?.id) {
         setIsLoading(false);
         return;
@@ -72,23 +100,40 @@ export default function Settings() {
       setLoadingError(null);
 
       try {
-        const userProfile = await profileService.getProfile(user.id);
-        if (userProfile) {
-          setProfile(userProfile);
-          setFirstName(userProfile.first_name || "");
-          setLastName(userProfile.last_name || "");
-          setCompany(userProfile.company || "");
-          setEmailNotifications(
-            userProfile.notification_settings.email_notifications
-          );
-          setWeeklyReports(userProfile.notification_settings.weekly_reports);
-          setCompetitorAlerts(
-            userProfile.notification_settings.competitor_alerts
-          );
-          setAnalysisComplete(
-            userProfile.notification_settings.analysis_complete
-          );
+        const userApiKeys = await apiKeyService.getApiKeys(user.id);
+        setApiKeys(userApiKeys);
+        if (userApiKeys.length > 0) {
+          setPrimaryApiKey(userApiKeys[0]?.key_prefix + "...");
         }
+      } catch (error) {
+        console.error("Failed to load API keys:", error);
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to load API keys.";
+        setLoadingError(errorMessage);
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadApiKeys();
+  }, [user?.id, toast]);
+
+  // Retry function for loading profile
+  const retryLoadProfile = async () => {
+    if (user?.id) {
+      setIsLoading(true);
+      setLoadingError(null);
+
+      try {
+        // Use the useProfile hook's loadProfile method
+        await loadProfile();
 
         // Load API keys
         const userApiKeys = await apiKeyService.getApiKeys(user.id);
@@ -103,64 +148,9 @@ export default function Settings() {
             ? error.message
             : "Failed to load profile data.";
         setLoadingError(errorMessage);
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
       } finally {
         setIsLoading(false);
       }
-    };
-
-    loadProfile();
-  }, [user?.id, toast]);
-
-  // Retry function for loading profile
-  const retryLoadProfile = () => {
-    if (user?.id) {
-      const loadProfile = async () => {
-        setIsLoading(true);
-        setLoadingError(null);
-
-        try {
-          const userProfile = await profileService.getProfile(user.id);
-          if (userProfile) {
-            setProfile(userProfile);
-            setFirstName(userProfile.first_name || "");
-            setLastName(userProfile.last_name || "");
-            setCompany(userProfile.company || "");
-            setEmailNotifications(
-              userProfile.notification_settings.email_notifications
-            );
-            setWeeklyReports(userProfile.notification_settings.weekly_reports);
-            setCompetitorAlerts(
-              userProfile.notification_settings.competitor_alerts
-            );
-            setAnalysisComplete(
-              userProfile.notification_settings.analysis_complete
-            );
-          }
-
-          // Load API keys
-          const userApiKeys = await apiKeyService.getApiKeys(user.id);
-          setApiKeys(userApiKeys);
-          if (userApiKeys.length > 0) {
-            setPrimaryApiKey(userApiKeys[0]?.key_prefix + "...");
-          }
-        } catch (error) {
-          console.error("Failed to load profile:", error);
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : "Failed to load profile data.";
-          setLoadingError(errorMessage);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      loadProfile();
     }
   };
 
@@ -179,13 +169,11 @@ export default function Settings() {
 
     setIsProfileSaving(true);
     try {
-      const updatedProfile = await profileService.updateProfile(user.id, {
+      await updateProfile({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         company: company.trim() || undefined,
       });
-
-      setProfile(updatedProfile);
 
       toast({
         title: "Profile updated",
@@ -206,6 +194,89 @@ export default function Settings() {
       setIsProfileSaving(false);
     }
   };
+
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    setUploadError(null);
+    setUploadSuccess(false);
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!user?.id) return;
+
+    setIsAvatarUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 100);
+
+      await uploadAvatar(file);
+      
+      // Complete progress
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setSelectedFile(null);
+      setUploadSuccess(true);
+      
+      toast({
+        title: "Avatar updated",
+        description: "Your profile picture has been updated.",
+      });
+
+      // Clear success state after delay
+      setTimeout(() => {
+        setUploadSuccess(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to upload avatar:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload avatar. Please try again.";
+      setUploadError(errorMessage);
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAvatarUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    if (!user?.id || !profile?.avatar_url) return;
+
+    setIsAvatarUploading(true);
+    try {
+      await deleteAvatar();
+      
+      toast({
+        title: "Avatar removed",
+        description: "Your profile picture has been removed.",
+      });
+    } catch (error) {
+      console.error("Failed to delete avatar:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove avatar. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAvatarUploading(false);
+    }
+  };
+
 
   const handlePasswordUpdate = async () => {
     // Validation
@@ -305,14 +376,12 @@ export default function Settings() {
     if (!user?.id || !profile) return;
 
     try {
-      const updatedProfile = await profileService.updateNotificationSettings(
+      await profileService.updateNotificationSettings(
         user.id,
         {
           [setting]: value,
         }
       );
-
-      setProfile(updatedProfile);
 
       // Update local state
       switch (setting) {
@@ -349,7 +418,7 @@ export default function Settings() {
           </p>
         </div>
 
-        {isLoading ? (
+        {(isLoading || isLoadingProfile) ? (
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">
@@ -386,6 +455,77 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Avatar Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-20 w-20">
+                      {profile?.avatar_url ? (
+                        <AvatarImage src={profile.avatar_url} alt="Profile" />
+                      ) : (
+                        <AvatarFallback className="text-lg">
+                          {getInitials()}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="flex-1">
+                      <Label className="text-base font-medium">Profile Picture</Label>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Upload a profile picture to personalize your account
+                      </p>
+                      {profile?.avatar_url && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAvatarDelete}
+                          disabled={isAvatarUploading}
+                          className="mt-2"
+                        >
+                          Remove Current Avatar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <FileDropZone
+                    onFileSelect={handleFileSelect}
+                    acceptedTypes={['image/*']}
+                    maxSize={2 * 1024 * 1024} // 2MB
+                    variant="avatar"
+                    isUploading={isAvatarUploading}
+                    uploadProgress={uploadProgress}
+                    error={uploadError}
+                    success={uploadSuccess}
+                    disabled={isAvatarUploading}
+                    placeholder="Click to upload or drag and drop your profile picture"
+                  />
+                  
+                  {selectedFile && !isAvatarUploading && !uploadSuccess && (
+                    <div className="flex gap-2">
+                      <LoadingButton
+                        type="button"
+                        onClick={() => handleAvatarUpload(selectedFile)}
+                        disabled={isAvatarUploading}
+                        className="flex-1"
+                      >
+                        Upload Avatar
+                      </LoadingButton>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setUploadError(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name</Label>

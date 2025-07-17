@@ -7,7 +7,7 @@ export interface BaseError {
 }
 
 export interface AuthError extends BaseError {
-  type: 'auth';
+  type: "auth";
   details?: {
     email?: string;
     provider?: string;
@@ -15,9 +15,9 @@ export interface AuthError extends BaseError {
 }
 
 export interface DatabaseError extends BaseError {
-  type: 'database';
+  type: "database";
   table?: string;
-  operation?: 'create' | 'read' | 'update' | 'delete';
+  operation?: "create" | "read" | "update" | "delete";
   details?: {
     constraint?: string;
     column?: string;
@@ -25,7 +25,7 @@ export interface DatabaseError extends BaseError {
 }
 
 export interface ValidationError extends BaseError {
-  type: 'validation';
+  type: "validation";
   field?: string;
   details?: {
     expected?: string;
@@ -35,7 +35,7 @@ export interface ValidationError extends BaseError {
 }
 
 export interface NetworkError extends BaseError {
-  type: 'network';
+  type: "network";
   status?: number;
   url?: string;
   details?: {
@@ -45,16 +45,36 @@ export interface NetworkError extends BaseError {
 }
 
 export interface ServiceError extends BaseError {
-  type: 'service';
-  service: 'profile' | 'workspace' | 'website' | 'analysis' | 'api-key' | 'dashboard';
+  type: "service";
+  service:
+    | "profile"
+    | "workspace"
+    | "website"
+    | "analysis"
+    | "api-key"
+    | "dashboard";
   operation?: string;
 }
 
-export type AppError = AuthError | DatabaseError | ValidationError | NetworkError | ServiceError;
+export interface UnknownError extends BaseError {
+  type: "unknown";
+  status: number;
+}
+
+export type AppError =
+  | AuthError
+  | DatabaseError
+  | ValidationError
+  | NetworkError
+  | ServiceError
+  | UnknownError;
 
 // Error factory functions
-export const createAuthError = (message: string, details?: AuthError['details']): AuthError => ({
-  type: 'auth',
+export const createAuthError = (
+  message: string,
+  details?: AuthError["details"]
+): AuthError => ({
+  type: "auth",
   message,
   details,
   timestamp: new Date().toISOString(),
@@ -63,10 +83,10 @@ export const createAuthError = (message: string, details?: AuthError['details'])
 export const createDatabaseError = (
   message: string,
   table?: string,
-  operation?: DatabaseError['operation'],
-  details?: DatabaseError['details']
+  operation?: DatabaseError["operation"],
+  details?: DatabaseError["details"]
 ): DatabaseError => ({
-  type: 'database',
+  type: "database",
   message,
   table,
   operation,
@@ -77,9 +97,9 @@ export const createDatabaseError = (
 export const createValidationError = (
   message: string,
   field?: string,
-  details?: ValidationError['details']
+  details?: ValidationError["details"]
 ): ValidationError => ({
-  type: 'validation',
+  type: "validation",
   message,
   field,
   details,
@@ -90,9 +110,9 @@ export const createNetworkError = (
   message: string,
   status?: number,
   url?: string,
-  details?: NetworkError['details']
+  details?: NetworkError["details"]
 ): NetworkError => ({
-  type: 'network',
+  type: "network",
   message,
   status,
   url,
@@ -102,10 +122,10 @@ export const createNetworkError = (
 
 export const createServiceError = (
   message: string,
-  service: ServiceError['service'],
+  service: ServiceError["service"],
   operation?: string
 ): ServiceError => ({
-  type: 'service',
+  type: "service",
   message,
   service,
   operation,
@@ -113,37 +133,44 @@ export const createServiceError = (
 });
 
 // Type guards
-export const isAuthError = (error: AppError): error is AuthError => error.type === 'auth';
-export const isDatabaseError = (error: AppError): error is DatabaseError => error.type === 'database';
-export const isValidationError = (error: AppError): error is ValidationError => error.type === 'validation';
-export const isNetworkError = (error: AppError): error is NetworkError => error.type === 'network';
-export const isServiceError = (error: AppError): error is ServiceError => error.type === 'service';
+export const isAuthError = (error: AppError): error is AuthError =>
+  error.type === "auth";
+export const isDatabaseError = (error: AppError): error is DatabaseError =>
+  error.type === "database";
+export const isValidationError = (error: AppError): error is ValidationError =>
+  error.type === "validation";
+export const isNetworkError = (error: AppError): error is NetworkError =>
+  error.type === "network";
+export const isServiceError = (error: AppError): error is ServiceError =>
+  error.type === "service";
+export const isUnknownError = (error: AppError): error is UnknownError =>
+  error.type === "unknown";
 
 // Error message helpers
 export const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
   }
-  if (typeof error === 'string') {
+  if (typeof error === "string") {
     return error;
   }
-  if (error && typeof error === 'object' && 'message' in error) {
+  if (error && typeof error === "object" && "message" in error) {
     return String(error.message);
   }
-  return 'An unknown error occurred';
+  return "An unknown error occurred";
 };
 
 export const formatErrorForUser = (error: AppError): string => {
   switch (error.type) {
-    case 'auth':
+    case "auth":
       return `Authentication error: ${error.message}`;
-    case 'database':
+    case "database":
       return `Data error: ${error.message}`;
-    case 'validation':
+    case "validation":
       return `Validation error: ${error.message}`;
-    case 'network':
+    case "network":
       return `Connection error: ${error.message}`;
-    case 'service':
+    case "service":
       return `Service error: ${error.message}`;
     default:
       return error.message;

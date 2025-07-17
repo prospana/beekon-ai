@@ -15,8 +15,21 @@
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
       "Bash(npx supabase link:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(ls:*)",
+      "Bash(diff:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx rimraf:*)",
+      "Bash(mv:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "enableAllProjectMcpServers": true
 }

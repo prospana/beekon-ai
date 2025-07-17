@@ -7,6 +7,11 @@ export type Json =
   | Json[];
 
 export type Database = {
+  // Allows to automatically instanciate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)";
+  };
   beekon_data: {
     Tables: {
       api_keys: {
@@ -54,6 +59,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      competitor_analysis_results: {
+        Row: {
+          analyzed_at: string | null;
+          competitor_id: string;
+          confidence_score: number | null;
+          created_at: string | null;
+          id: string;
+          is_mentioned: boolean | null;
+          llm_provider: string;
+          prompt_id: string;
+          rank_position: number | null;
+          response_text: string | null;
+          sentiment_score: number | null;
+          summary_text: string | null;
+        };
+        Insert: {
+          analyzed_at?: string | null;
+          competitor_id: string;
+          confidence_score?: number | null;
+          created_at?: string | null;
+          id?: string;
+          is_mentioned?: boolean | null;
+          llm_provider: string;
+          prompt_id: string;
+          rank_position?: number | null;
+          response_text?: string | null;
+          sentiment_score?: number | null;
+          summary_text?: string | null;
+        };
+        Update: {
+          analyzed_at?: string | null;
+          competitor_id?: string;
+          confidence_score?: number | null;
+          created_at?: string | null;
+          id?: string;
+          is_mentioned?: boolean | null;
+          llm_provider?: string;
+          prompt_id?: string;
+          rank_position?: number | null;
+          response_text?: string | null;
+          sentiment_score?: number | null;
+          summary_text?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "competitor_analysis_results_competitor_id_fkey";
+            columns: ["competitor_id"];
+            isOneToOne: false;
+            referencedRelation: "competitors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "competitor_analysis_results_prompt_id_fkey";
+            columns: ["prompt_id"];
+            isOneToOne: false;
+            referencedRelation: "prompts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       competitors: {
         Row: {
           analysis_frequency: string | null;
@@ -92,6 +157,14 @@ export type Database = {
           {
             foreignKeyName: "competitors_website_id_fkey";
             columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
             referencedRelation: "websites";
             referencedColumns: ["id"];
           }
@@ -144,12 +217,21 @@ export type Database = {
           {
             foreignKeyName: "llm_analysis_results_prompt_id_fkey";
             columns: ["prompt_id"];
+            isOneToOne: false;
             referencedRelation: "prompts";
             referencedColumns: ["id"];
           },
           {
             foreignKeyName: "llm_analysis_results_website_id_fkey";
             columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "llm_analysis_results_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
             referencedRelation: "websites";
             referencedColumns: ["id"];
           }
@@ -202,6 +284,7 @@ export type Database = {
           {
             foreignKeyName: "profiles_workspace_id_fkey";
             columns: ["workspace_id"];
+            isOneToOne: false;
             referencedRelation: "workspaces";
             referencedColumns: ["id"];
           }
@@ -254,6 +337,7 @@ export type Database = {
           {
             foreignKeyName: "prompts_topic_id_fkey";
             columns: ["topic_id"];
+            isOneToOne: false;
             referencedRelation: "topics";
             referencedColumns: ["id"];
           }
@@ -264,7 +348,6 @@ export type Database = {
           created_at: string | null;
           id: string;
           is_active: boolean | null;
-          is_validated: boolean | null;
           priority: number | null;
           recommendation_text: string | null;
           reporting_text: string | null;
@@ -276,7 +359,6 @@ export type Database = {
           created_at?: string | null;
           id?: string;
           is_active?: boolean | null;
-          is_validated?: boolean | null;
           priority?: number | null;
           recommendation_text?: string | null;
           reporting_text?: string | null;
@@ -288,7 +370,6 @@ export type Database = {
           created_at?: string | null;
           id?: string;
           is_active?: boolean | null;
-          is_validated?: boolean | null;
           priority?: number | null;
           recommendation_text?: string | null;
           reporting_text?: string | null;
@@ -300,6 +381,14 @@ export type Database = {
           {
             foreignKeyName: "topics_website_id_fkey";
             columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "topics_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
             referencedRelation: "websites";
             referencedColumns: ["id"];
           }
@@ -331,6 +420,14 @@ export type Database = {
           {
             foreignKeyName: "website_settings_website_id_fkey";
             columns: ["website_id"];
+            isOneToOne: true;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "website_settings_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: true;
             referencedRelation: "websites";
             referencedColumns: ["id"];
           }
@@ -374,6 +471,7 @@ export type Database = {
           {
             foreignKeyName: "websites_workspace_id_fkey";
             columns: ["workspace_id"];
+            isOneToOne: false;
             referencedRelation: "workspaces";
             referencedColumns: ["id"];
           }
@@ -417,17 +515,323 @@ export type Database = {
           {
             foreignKeyName: "workspaces_owner_id_fkey";
             columns: ["owner_id"];
+            isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["user_id"];
+          },
+          {
+            foreignKeyName: "workspaces_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
             referencedColumns: ["user_id"];
           }
         ];
       };
     };
     Views: {
-      [_ in never]: never;
+      mv_competitor_daily_metrics: {
+        Row: {
+          analysis_date: string | null;
+          competitor_domain: string | null;
+          daily_avg_rank: number | null;
+          daily_avg_sentiment: number | null;
+          daily_llm_providers: number | null;
+          daily_mentions: number | null;
+          daily_positive_mentions: number | null;
+          llm_providers_list: string[] | null;
+          website_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      mv_competitor_performance: {
+        Row: {
+          avg_confidence_score: number | null;
+          avg_rank_position: number | null;
+          avg_sentiment_score: number | null;
+          competitor_domain: string | null;
+          competitor_id: string | null;
+          competitor_name: string | null;
+          last_analysis_date: string | null;
+          llm_providers_count: number | null;
+          mention_trend_7d: number | null;
+          mentions_last_30_days: number | null;
+          mentions_last_7_days: number | null;
+          positive_mentions: number | null;
+          recent_avg_rank: number | null;
+          recent_sentiment_score: number | null;
+          total_mentions: number | null;
+          website_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      mv_competitor_share_of_voice: {
+        Row: {
+          avg_confidence_score: number | null;
+          avg_rank_position: number | null;
+          avg_sentiment_score: number | null;
+          competitor_domain: string | null;
+          competitor_id: string | null;
+          competitor_name: string | null;
+          last_analyzed_at: string | null;
+          share_of_voice: number | null;
+          total_analyses: number | null;
+          total_voice_mentions: number | null;
+          website_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      mv_competitive_gap_analysis: {
+        Row: {
+          competitor_avg_score: number | null;
+          competitor_count: number | null;
+          gap_type: string | null;
+          performance_gap: number | null;
+          topic_id: string | null;
+          topic_name: string | null;
+          website_id: string | null;
+          your_brand_score: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "topics_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "topics_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      user_accessible_websites: {
+        Row: {
+          user_id: string | null;
+          website_id: string | null;
+          workspace_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "websites_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Functions: {
-      [_ in never]: never;
+      get_batch_website_metrics: {
+        Args: {
+          p_website_ids: string[];
+          p_date_start?: string;
+          p_date_end?: string;
+        };
+        Returns: {
+          website_id: string;
+          domain: string;
+          display_name: string;
+          total_analyses: number;
+          total_mentions: number;
+          avg_sentiment: number;
+          avg_rank: number;
+          visibility_score: number;
+        }[];
+      };
+      get_competitor_performance: {
+        Args: { p_website_id: string; p_limit?: number; p_offset?: number };
+        Returns: {
+          competitor_id: string;
+          competitor_domain: string;
+          competitor_name: string;
+          total_mentions: number;
+          positive_mentions: number;
+          avg_rank_position: number;
+          avg_sentiment_score: number;
+          avg_confidence_score: number;
+          llm_providers_count: number;
+          last_analysis_date: string;
+          mentions_last_7_days: number;
+          mentions_last_30_days: number;
+          mention_trend_7d: number;
+          recent_sentiment_score: number;
+          recent_avg_rank: number;
+        }[];
+      };
+      get_competitor_share_of_voice: {
+        Args: {
+          p_website_id: string;
+          p_date_start?: string;
+          p_date_end?: string;
+        };
+        Returns: {
+          competitor_id: string;
+          competitor_name: string;
+          competitor_domain: string;
+          total_analyses: number;
+          total_voice_mentions: number;
+          share_of_voice: number;
+          avg_rank_position: number;
+          avg_sentiment_score: number;
+          avg_confidence_score: number;
+        }[];
+      };
+      get_competitive_gap_analysis: {
+        Args: {
+          p_website_id: string;
+          p_date_start?: string;
+          p_date_end?: string;
+        };
+        Returns: {
+          topic_id: string;
+          topic_name: string;
+          your_brand_score: number;
+          competitor_data: unknown;
+        }[];
+      };
+      analyze_competitor_mentions: {
+        Args: {
+          p_website_id: string;
+          p_competitor_id: string;
+          p_prompt_id: string;
+          p_llm_provider: string;
+          p_response_text: string;
+        };
+        Returns: {
+          is_mentioned: boolean;
+          rank_position: number;
+          sentiment_score: number;
+          confidence_score: number;
+          summary_text: string;
+        }[];
+      };
+      get_competitor_query_stats: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          query_type: string;
+          avg_execution_time: unknown;
+          total_calls: number;
+          cache_hit_ratio: number;
+        }[];
+      };
+      get_competitor_time_series: {
+        Args: {
+          p_website_id: string;
+          p_competitor_domain?: string;
+          p_days?: number;
+        };
+        Returns: {
+          analysis_date: string;
+          competitor_domain: string;
+          daily_mentions: number;
+          daily_positive_mentions: number;
+          daily_avg_rank: number;
+          daily_avg_sentiment: number;
+          daily_llm_providers: number;
+        }[];
+      };
+      get_dashboard_time_series: {
+        Args: {
+          p_website_ids: string[];
+          p_date_start: string;
+          p_date_end: string;
+          p_interval_type?: string;
+        };
+        Returns: {
+          period_start: string;
+          total_mentions: number;
+          avg_sentiment: number;
+          avg_rank: number;
+        }[];
+      };
+      get_llm_performance: {
+        Args: {
+          p_website_ids: string[];
+          p_date_start?: string;
+          p_date_end?: string;
+        };
+        Returns: {
+          llm_provider: string;
+          total_analyses: number;
+          total_mentions: number;
+          avg_sentiment: number;
+          avg_rank: number;
+          visibility_score: number;
+        }[];
+      };
+      get_website_metrics: {
+        Args: {
+          p_website_id: string;
+          p_date_start?: string;
+          p_date_end?: string;
+        };
+        Returns: {
+          total_analyses: number;
+          total_mentions: number;
+          avg_sentiment: number;
+          avg_rank: number;
+          visibility_score: number;
+        }[];
+      };
+      refresh_competitor_performance_views: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      refresh_competitor_analysis_views: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;
@@ -461,449 +865,176 @@ export type Database = {
       [_ in never]: never;
     };
   };
-  pgbouncer: {
-    Tables: {
-      [_ in never]: never;
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      get_auth: {
-        Args: { p_usename: string };
-        Returns: {
-          username: string;
-          password: string;
-        }[];
-      };
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
   public: {
     Tables: {
-      [_ in never]: never;
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      [_ in never]: never;
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
-  storage: {
-    Tables: {
-      buckets: {
+      api_keys: {
         Row: {
-          allowed_mime_types: string[] | null;
-          avif_autodetection: boolean | null;
           created_at: string | null;
-          file_size_limit: number | null;
           id: string;
+          is_active: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at: string | null;
           name: string;
-          owner: string | null;
-          owner_id: string | null;
-          public: boolean | null;
-          updated_at: string | null;
+          usage_count: number | null;
+          user_id: string;
         };
         Insert: {
-          allowed_mime_types?: string[] | null;
-          avif_autodetection?: boolean | null;
           created_at?: string | null;
-          file_size_limit?: number | null;
-          id: string;
-          name: string;
-          owner?: string | null;
-          owner_id?: string | null;
-          public?: boolean | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          allowed_mime_types?: string[] | null;
-          avif_autodetection?: boolean | null;
-          created_at?: string | null;
-          file_size_limit?: number | null;
           id?: string;
-          name?: string;
-          owner?: string | null;
-          owner_id?: string | null;
-          public?: boolean | null;
-          updated_at?: string | null;
-        };
-        Relationships: [];
-      };
-      migrations: {
-        Row: {
-          executed_at: string | null;
-          hash: string;
-          id: number;
+          is_active?: boolean | null;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at?: string | null;
           name: string;
-        };
-        Insert: {
-          executed_at?: string | null;
-          hash: string;
-          id: number;
-          name: string;
+          usage_count?: number | null;
+          user_id: string;
         };
         Update: {
-          executed_at?: string | null;
-          hash?: string;
-          id?: number;
+          created_at?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          key_hash?: string;
+          key_prefix?: string;
+          last_used_at?: string | null;
           name?: string;
+          usage_count?: number | null;
+          user_id?: string;
         };
         Relationships: [];
       };
-      objects: {
+      api_keys_backup: {
         Row: {
-          bucket_id: string | null;
           created_at: string | null;
-          id: string;
-          last_accessed_at: string | null;
-          level: number | null;
-          metadata: Json | null;
+          id: string | null;
+          is_active: boolean | null;
+          key_hash: string | null;
+          key_prefix: string | null;
+          last_used_at: string | null;
           name: string | null;
-          owner: string | null;
-          owner_id: string | null;
-          path_tokens: string[] | null;
-          updated_at: string | null;
-          user_metadata: Json | null;
-          version: string | null;
+          usage_count: number | null;
+          user_id: string | null;
         };
         Insert: {
-          bucket_id?: string | null;
           created_at?: string | null;
-          id?: string;
-          last_accessed_at?: string | null;
-          level?: number | null;
-          metadata?: Json | null;
+          id?: string | null;
+          is_active?: boolean | null;
+          key_hash?: string | null;
+          key_prefix?: string | null;
+          last_used_at?: string | null;
           name?: string | null;
-          owner?: string | null;
-          owner_id?: string | null;
-          path_tokens?: string[] | null;
-          updated_at?: string | null;
-          user_metadata?: Json | null;
-          version?: string | null;
+          usage_count?: number | null;
+          user_id?: string | null;
         };
         Update: {
-          bucket_id?: string | null;
           created_at?: string | null;
-          id?: string;
-          last_accessed_at?: string | null;
-          level?: number | null;
-          metadata?: Json | null;
+          id?: string | null;
+          is_active?: boolean | null;
+          key_hash?: string | null;
+          key_prefix?: string | null;
+          last_used_at?: string | null;
           name?: string | null;
-          owner?: string | null;
-          owner_id?: string | null;
-          path_tokens?: string[] | null;
-          updated_at?: string | null;
-          user_metadata?: Json | null;
-          version?: string | null;
+          usage_count?: number | null;
+          user_id?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "objects_bucketId_fkey";
-            columns: ["bucket_id"];
-            referencedRelation: "buckets";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
-      prefixes: {
+      profiles: {
         Row: {
-          bucket_id: string;
+          avatar_url: string | null;
+          company: string | null;
           created_at: string | null;
-          level: number;
-          name: string;
+          email: string | null;
+          first_name: string | null;
+          full_name: string | null;
+          id: string;
+          last_name: string | null;
+          notification_settings: Json | null;
           updated_at: string | null;
+          user_id: string;
+          workspace_id: string | null;
         };
         Insert: {
-          bucket_id: string;
+          avatar_url?: string | null;
+          company?: string | null;
           created_at?: string | null;
-          level?: number;
-          name: string;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
           updated_at?: string | null;
+          user_id: string;
+          workspace_id?: string | null;
         };
         Update: {
-          bucket_id?: string;
+          avatar_url?: string | null;
+          company?: string | null;
           created_at?: string | null;
-          level?: number;
-          name?: string;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string;
+          last_name?: string | null;
+          notification_settings?: Json | null;
           updated_at?: string | null;
+          user_id?: string;
+          workspace_id?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "prefixes_bucketId_fkey";
-            columns: ["bucket_id"];
-            referencedRelation: "buckets";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
-      s3_multipart_uploads: {
+      profiles_backup: {
         Row: {
-          bucket_id: string;
-          created_at: string;
-          id: string;
-          in_progress_size: number;
-          key: string;
-          owner_id: string | null;
-          upload_signature: string;
-          user_metadata: Json | null;
-          version: string;
+          avatar_url: string | null;
+          company: string | null;
+          created_at: string | null;
+          email: string | null;
+          first_name: string | null;
+          full_name: string | null;
+          id: string | null;
+          last_name: string | null;
+          notification_settings: Json | null;
+          updated_at: string | null;
+          user_id: string | null;
+          workspace_id: string | null;
         };
         Insert: {
-          bucket_id: string;
-          created_at?: string;
-          id: string;
-          in_progress_size?: number;
-          key: string;
-          owner_id?: string | null;
-          upload_signature: string;
-          user_metadata?: Json | null;
-          version: string;
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string | null;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id?: string | null;
+          workspace_id?: string | null;
         };
         Update: {
-          bucket_id?: string;
-          created_at?: string;
-          id?: string;
-          in_progress_size?: number;
-          key?: string;
-          owner_id?: string | null;
-          upload_signature?: string;
-          user_metadata?: Json | null;
-          version?: string;
+          avatar_url?: string | null;
+          company?: string | null;
+          created_at?: string | null;
+          email?: string | null;
+          first_name?: string | null;
+          full_name?: string | null;
+          id?: string | null;
+          last_name?: string | null;
+          notification_settings?: Json | null;
+          updated_at?: string | null;
+          user_id?: string | null;
+          workspace_id?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "s3_multipart_uploads_bucket_id_fkey";
-            columns: ["bucket_id"];
-            referencedRelation: "buckets";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-      s3_multipart_uploads_parts: {
-        Row: {
-          bucket_id: string;
-          created_at: string;
-          etag: string;
-          id: string;
-          key: string;
-          owner_id: string | null;
-          part_number: number;
-          size: number;
-          upload_id: string;
-          version: string;
-        };
-        Insert: {
-          bucket_id: string;
-          created_at?: string;
-          etag: string;
-          id?: string;
-          key: string;
-          owner_id?: string | null;
-          part_number: number;
-          size?: number;
-          upload_id: string;
-          version: string;
-        };
-        Update: {
-          bucket_id?: string;
-          created_at?: string;
-          etag?: string;
-          id?: string;
-          key?: string;
-          owner_id?: string | null;
-          part_number?: number;
-          size?: number;
-          upload_id?: string;
-          version?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "s3_multipart_uploads_parts_bucket_id_fkey";
-            columns: ["bucket_id"];
-            referencedRelation: "buckets";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "s3_multipart_uploads_parts_upload_id_fkey";
-            columns: ["upload_id"];
-            referencedRelation: "s3_multipart_uploads";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      add_prefixes: {
-        Args: { _bucket_id: string; _name: string };
-        Returns: undefined;
-      };
-      can_insert_object: {
-        Args: { bucketid: string; name: string; owner: string; metadata: Json };
-        Returns: undefined;
-      };
-      delete_prefix: {
-        Args: { _bucket_id: string; _name: string };
-        Returns: boolean;
-      };
-      extension: {
-        Args: { name: string };
-        Returns: string;
-      };
-      filename: {
-        Args: { name: string };
-        Returns: string;
-      };
-      foldername: {
-        Args: { name: string };
-        Returns: string[];
-      };
-      get_level: {
-        Args: { name: string };
-        Returns: number;
-      };
-      get_prefix: {
-        Args: { name: string };
-        Returns: string;
-      };
-      get_prefixes: {
-        Args: { name: string };
-        Returns: string[];
-      };
-      get_size_by_bucket: {
-        Args: Record<PropertyKey, never>;
-        Returns: {
-          size: number;
-          bucket_id: string;
-        }[];
-      };
-      list_multipart_uploads_with_delimiter: {
-        Args: {
-          bucket_id: string;
-          prefix_param: string;
-          delimiter_param: string;
-          max_keys?: number;
-          next_key_token?: string;
-          next_upload_token?: string;
-        };
-        Returns: {
-          key: string;
-          id: string;
-          created_at: string;
-        }[];
-      };
-      list_objects_with_delimiter: {
-        Args: {
-          bucket_id: string;
-          prefix_param: string;
-          delimiter_param: string;
-          max_keys?: number;
-          start_after?: string;
-          next_token?: string;
-        };
-        Returns: {
-          name: string;
-          id: string;
-          metadata: Json;
-          updated_at: string;
-        }[];
-      };
-      operation: {
-        Args: Record<PropertyKey, never>;
-        Returns: string;
-      };
-      search: {
-        Args: {
-          prefix: string;
-          bucketname: string;
-          limits?: number;
-          levels?: number;
-          offsets?: number;
-          search?: string;
-          sortcolumn?: string;
-          sortorder?: string;
-        };
-        Returns: {
-          name: string;
-          id: string;
-          updated_at: string;
-          created_at: string;
-          last_accessed_at: string;
-          metadata: Json;
-        }[];
-      };
-      search_legacy_v1: {
-        Args: {
-          prefix: string;
-          bucketname: string;
-          limits?: number;
-          levels?: number;
-          offsets?: number;
-          search?: string;
-          sortcolumn?: string;
-          sortorder?: string;
-        };
-        Returns: {
-          name: string;
-          id: string;
-          updated_at: string;
-          created_at: string;
-          last_accessed_at: string;
-          metadata: Json;
-        }[];
-      };
-      search_v1_optimised: {
-        Args: {
-          prefix: string;
-          bucketname: string;
-          limits?: number;
-          levels?: number;
-          offsets?: number;
-          search?: string;
-          sortcolumn?: string;
-          sortorder?: string;
-        };
-        Returns: {
-          name: string;
-          id: string;
-          updated_at: string;
-          created_at: string;
-          last_accessed_at: string;
-          metadata: Json;
-        }[];
-      };
-      search_v2: {
-        Args: {
-          prefix: string;
-          bucket_name: string;
-          limits?: number;
-          levels?: number;
-          start_after?: string;
-        };
-        Returns: {
-          key: string;
-          name: string;
-          id: string;
-          updated_at: string;
-          created_at: string;
-          metadata: Json;
-        }[];
-      };
+      [_ in never]: never;
     };
     Enums: {
       [_ in never]: never;
@@ -914,21 +1045,28 @@ export type Database = {
   };
 };
 
-type DefaultSchema = Database[Extract<keyof Database, "public">];
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<
+  keyof Database,
+  "public"
+>];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R;
     }
     ? R
@@ -946,14 +1084,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I;
     }
     ? I
@@ -969,14 +1109,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U;
     }
     ? U
@@ -992,14 +1134,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
   ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
   : never;
@@ -1007,14 +1151,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals;
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
   ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
   : never;
@@ -1026,13 +1172,7 @@ export const Constants = {
   graphql_public: {
     Enums: {},
   },
-  pgbouncer: {
-    Enums: {},
-  },
   public: {
-    Enums: {},
-  },
-  storage: {
     Enums: {},
   },
 } as const;

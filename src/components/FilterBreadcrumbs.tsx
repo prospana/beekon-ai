@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Filter } from "lucide-react";
+import { Filter, X } from "lucide-react";
 
 interface FilterBreadcrumbsProps {
   filters: {
@@ -8,7 +8,7 @@ interface FilterBreadcrumbsProps {
     llm?: string;
     search?: string;
   };
-  onRemoveFilter: (filterType: 'topic' | 'llm' | 'search') => void;
+  onRemoveFilter: (filterType: "topic" | "llm" | "search") => void;
   onClearAll: () => void;
   resultCount?: number;
 }
@@ -26,26 +26,26 @@ export function FilterBreadcrumbs({
   }
 
   const filterItems = [];
-  
+
   if (filters.topic) {
     filterItems.push({
-      type: 'topic' as const,
+      type: "topic" as const,
       label: `Topic: ${filters.topic}`,
       value: filters.topic,
     });
   }
-  
+
   if (filters.llm) {
     filterItems.push({
-      type: 'llm' as const,
+      type: "llm" as const,
       label: `LLM: ${filters.llm}`,
       value: filters.llm,
     });
   }
-  
+
   if (filters.search) {
     filterItems.push({
-      type: 'search' as const,
+      type: "search" as const,
       label: `Search: "${filters.search}"`,
       value: filters.search,
     });
@@ -57,7 +57,7 @@ export function FilterBreadcrumbs({
       <span className="text-sm font-medium text-muted-foreground">
         Active filters:
       </span>
-      
+
       <div className="flex items-center gap-2 flex-wrap">
         {filterItems.map((item) => (
           <Badge
@@ -80,7 +80,7 @@ export function FilterBreadcrumbs({
 
       {resultCount !== undefined && (
         <span className="text-sm text-muted-foreground">
-          ({resultCount} result{resultCount !== 1 ? 's' : ''})
+          ({resultCount} result{resultCount !== 1 ? "s" : ""})
         </span>
       )}
 

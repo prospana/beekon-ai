@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Competitor, CompetitorInsert, CompetitorUpdate, AnalysisResult, LLMResult } from "@/types/database";
 import BaseService from "./baseService";
+import { 
+  competitorAnalysisService, 
+  type CompetitorShareOfVoice, 
+  type CompetitiveGapAnalysis,
+  type CompetitorInsight 
+} from "./competitorAnalysisService";
 
 export interface CompetitorPerformance {
   competitorId: string;
@@ -50,24 +56,61 @@ export interface CompetitorAnalytics {
   }>;
   competitiveGaps: CompetitorComparison[];
   timeSeriesData: CompetitorTimeSeriesData[];
+  shareOfVoice: CompetitorShareOfVoice[];
+  gapAnalysis: CompetitiveGapAnalysis[];
+  insights: CompetitorInsight[];
 }
 
-export class CompetitorService extends BaseService {
-  private static instance: CompetitorService;
-  protected serviceName = 'website' as const;
+export class OptimizedCompetitorService extends BaseService {
+  private static instance: OptimizedCompetitorService;
+  protected serviceName = 'competitor' as const;
+  private cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
 
-  public static getInstance(): CompetitorService {
-    if (!CompetitorService.instance) {
-      CompetitorService.instance = new CompetitorService();
+  public static getInstance(): OptimizedCompetitorService {
+    if (!OptimizedCompetitorService.instance) {
+      OptimizedCompetitorService.instance = new OptimizedCompetitorService();
     }
-    return CompetitorService.instance;
+    return OptimizedCompetitorService.instance;
   }
 
   /**
-   * Get all competitors for a website
+   * Get cached data or fetch new data
+   */
+  private async getCachedData<T>(
+    key: string,
+    fetchFunction: () => Promise<T>,
+    ttl: number = 300000 // 5 minutes default
+  ): Promise<T> {
+    const cached = this.cache.get(key);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < cached.ttl) {
+      return cached.data;
+    }
+
+    const data = await fetchFunction();
+    this.cache.set(key, { data, timestamp: now, ttl });
+    return data;
+  }
+
+  /**
+   * Clear cache for specific key or all cache
+   */
+  private clearCache(key?: string): void {
+    if (key) {
+      this.cache.delete(key);
+    } else {
+      this.cache.clear();
+    }
+  }
+
+  /**
+   * Get all competitors for a website (optimized)
    */
   async getCompetitors(websiteId: string): Promise<Competitor[]> {
-    try {
+    const cacheKey = `competitors_${websiteId}`;
+    
+    return this.getCachedData(cacheKey, async () => {
       const { data, error } = await supabase
         .schema("beekon_data")
         .from("competitors")
@@ -77,59 +120,298 @@ export class CompetitorService extends BaseService {
         .order("created_at", { ascending: true });
 
       if (error) throw error;
+      return data || [];
+    });
+  }
 
+  /**
+   * Get competitor performance metrics (optimized with database functions)
+   */
+  async getCompetitorPerformance(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<CompetitorPerformance[]> {
+    const cacheKey = `performance_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      // First check if there are any competitors for this website
+      const { data: competitors } = await supabase
+        .schema("beekon_data")
+        .from("competitors")
+        .select("id")
+        .eq("website_id", websiteId)
+        .eq("is_active", true)
+        .limit(1);
+
+      // If no competitors exist, return empty array immediately
+      if (!competitors || competitors.length === 0) {
+        return [];
+      }
+
+      // Use the optimized database function
+      const { data, error } = await supabase
+        .rpc('get_competitor_performance', {
+          p_website_id: websiteId,
+          p_limit: 50,
+          p_offset: 0
+        });
+
+      if (error) throw error;
+
+      // Transform database results to match interface with safe calculations
+      return (data || []).map((row: Record<string, unknown>) => {
+        const totalMentions = row.total_mentions || 0;
+        const positiveMentions = row.positive_mentions || 0;
+        const avgSentiment = row.avg_sentiment_score;
+        const avgRank = row.avg_rank_position;
+        const mentionTrend = row.mention_trend_7d;
+
+        return {
+          competitorId: row.competitor_id,
+          domain: row.competitor_domain,
+          name: row.competitor_name || row.competitor_domain,
+          shareOfVoice: totalMentions > 0 ? Math.round((positiveMentions / totalMentions) * 100) : 0,
+          averageRank: avgRank && !isNaN(avgRank) ? avgRank : 0,
+          mentionCount: totalMentions,
+          sentimentScore: avgSentiment && !isNaN(avgSentiment) ? Math.round((avgSentiment + 1) * 50) : 50,
+          visibilityScore: totalMentions > 0 ? Math.round((positiveMentions / totalMentions) * 100) : 0,
+          trend: this.calculateTrend(mentionTrend),
+          trendPercentage: mentionTrend && !isNaN(mentionTrend) ? Math.abs(mentionTrend) : 0,
+          lastAnalyzed: row.last_analysis_date || new Date().toISOString(),
+          isActive: true,
+        };
+      });
+    });
+  }
+
+  /**
+   * Get competitor time series data (optimized with database functions)
+   */
+  async getCompetitorTimeSeriesData(
+    websiteId: string,
+    competitorDomain?: string,
+    days: number = 30
+  ): Promise<CompetitorTimeSeriesData[]> {
+    const cacheKey = `timeseries_${websiteId}_${competitorDomain || 'all'}_${days}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      // First check if there are any competitors for this website
+      const { data: competitors } = await supabase
+        .schema("beekon_data")
+        .from("competitors")
+        .select("id")
+        .eq("website_id", websiteId)
+        .eq("is_active", true)
+        .limit(1);
+
+      // If no competitors exist, return empty array immediately
+      if (!competitors || competitors.length === 0) {
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .rpc('get_competitor_time_series', {
+          p_website_id: websiteId,
+          p_competitor_domain: competitorDomain,
+          p_days: days
+        });
+
+      if (error) throw error;
+
+      // Group by date
+      const timeSeriesMap = new Map<string, CompetitorTimeSeriesData>();
+      
+      (data || []).forEach((row: Record<string, unknown>) => {
+        const dateStr = row.analysis_date;
+        if (!timeSeriesMap.has(dateStr)) {
+          timeSeriesMap.set(dateStr, {
+            date: dateStr,
+            competitors: []
+          });
+        }
+
+        const dailyMentions = row.daily_mentions || 0;
+        const dailyPositiveMentions = row.daily_positive_mentions || 0;
+        const dailyAvgSentiment = row.daily_avg_sentiment;
+        const dailyAvgRank = row.daily_avg_rank;
+
+        timeSeriesMap.get(dateStr)!.competitors.push({
+          competitorId: '', // Would need to join with competitors table
+          name: row.competitor_domain,
+          shareOfVoice: dailyMentions > 0 ? Math.round((dailyPositiveMentions / dailyMentions) * 100) : 0,
+          averageRank: dailyAvgRank && !isNaN(dailyAvgRank) ? dailyAvgRank : 0,
+          mentionCount: dailyMentions,
+          sentimentScore: dailyAvgSentiment && !isNaN(dailyAvgSentiment) ? Math.round((dailyAvgSentiment + 1) * 50) : 50
+        });
+      });
+
+      return Array.from(timeSeriesMap.values()).sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+    });
+  }
+
+  /**
+   * Get competitive analysis (optimized with parallel queries)
+   */
+  async getCompetitiveAnalysis(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<CompetitorAnalytics> {
+    const cacheKey = `analytics_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      // First check if there are any competitors for this website
+      const { data: hasCompetitors } = await supabase
+        .schema("beekon_data")
+        .from("competitors")
+        .select("id")
+        .eq("website_id", websiteId)
+        .eq("is_active", true)
+        .limit(1);
+
+      // If no competitors exist, return empty analytics immediately
+      if (!hasCompetitors || hasCompetitors.length === 0) {
+        return {
+          totalCompetitors: 0,
+          activeCompetitors: 0,
+          averageCompetitorRank: 0,
+          marketShareData: [
+            {
+              name: "Your Brand",
+              value: 0,
+            }
+          ],
+          competitiveGaps: [],
+          timeSeriesData: [],
+          shareOfVoice: [],
+          gapAnalysis: [],
+          insights: [],
+        };
+      }
+
+      // Execute all queries in parallel
+      const [
+        competitors, 
+        yourBrandResults, 
+        timeSeriesData,
+        shareOfVoice,
+        gapAnalysis,
+        insights
+      ] = await Promise.all([
+        this.getCompetitorPerformance(websiteId, dateRange),
+        this.getAnalysisResultsForWebsite(websiteId, dateRange),
+        this.getCompetitorTimeSeriesData(websiteId, undefined, 30),
+        competitorAnalysisService.getCompetitorShareOfVoice(websiteId, dateRange),
+        competitorAnalysisService.getCompetitiveGapAnalysis(websiteId, dateRange),
+        competitorAnalysisService.getCompetitorInsights(websiteId, dateRange)
+      ]);
+
+      // Calculate your brand's metrics efficiently
+      const yourBrandMetrics = this.calculateBrandMetrics(yourBrandResults);
+
+      // Generate market share data using real competitor data
+      const marketShareData = [
+        {
+          name: "Your Brand",
+          value: yourBrandMetrics.overallVisibilityScore,
+        },
+        ...shareOfVoice.map((comp) => ({
+          name: comp.competitorName,
+          value: comp.shareOfVoice,
+          competitorId: comp.competitorId,
+        })),
+      ];
+
+      // Generate competitive gap analysis (legacy format for compatibility)
+      const competitiveGaps = this.calculateCompetitiveGaps(
+        competitors,
+        yourBrandResults
+      );
+
+      return {
+        totalCompetitors: competitors.length,
+        activeCompetitors: competitors.filter((c) => c.isActive).length,
+        averageCompetitorRank: competitors.length > 0 
+          ? competitors.reduce((sum, c) => sum + (c.averageRank || 0), 0) / competitors.length
+          : 0,
+        marketShareData,
+        competitiveGaps,
+        timeSeriesData,
+        shareOfVoice,
+        gapAnalysis,
+        insights,
+      };
+    });
+  }
+
+  /**
+   * Batch add competitors (optimized for multiple inserts)
+   */
+  async batchAddCompetitors(
+    websiteId: string,
+    competitors: Array<{ domain: string; name?: string }>
+  ): Promise<Competitor[]> {
+    try {
+      // Check for existing competitors in batch
+      const domains = competitors.map(c => c.domain);
+      const { data: existing } = await supabase
+        .schema("beekon_data")
+        .from("competitors")
+        .select("competitor_domain")
+        .eq("website_id", websiteId)
+        .in("competitor_domain", domains);
+
+      const existingDomains = new Set(existing?.map(e => e.competitor_domain) || []);
+      const newCompetitors = competitors.filter(c => !existingDomains.has(c.domain));
+
+      if (newCompetitors.length === 0) {
+        return [];
+      }
+
+      // Batch insert new competitors
+      const { data, error } = await supabase
+        .schema("beekon_data")
+        .from("competitors")
+        .insert(
+          newCompetitors.map(comp => ({
+            website_id: websiteId,
+            competitor_domain: comp.domain,
+            competitor_name: comp.name || null,
+            is_active: true,
+          }))
+        )
+        .select();
+
+      if (error) throw error;
+
+      // Clear cache
+      this.clearCache(`competitors_${websiteId}`);
+      
       return data || [];
     } catch (error) {
-      console.error("Failed to fetch competitors:", error);
+      console.error("Failed to batch add competitors:", error);
       throw error;
     }
   }
 
   /**
-   * Add a new competitor
+   * Add a new competitor (optimized)
    */
   async addCompetitor(
     websiteId: string,
     domain: string,
     name?: string
   ): Promise<Competitor> {
-    try {
-      // Check if competitor already exists
-      const { data: existing } = await supabase
-        .schema("beekon_data")
-        .from("competitors")
-        .select("id")
-        .eq("website_id", websiteId)
-        .eq("competitor_domain", domain)
-        .single();
-
-      if (existing) {
-        throw new Error("Competitor already exists");
-      }
-
-      const { data, error } = await supabase
-        .schema("beekon_data")
-        .from("competitors")
-        .insert({
-          website_id: websiteId,
-          competitor_domain: domain,
-          competitor_name: name || null,
-          is_active: true,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      return data;
-    } catch (error) {
-      console.error("Failed to add competitor:", error);
-      throw error;
+    const result = await this.batchAddCompetitors(websiteId, [{ domain, name }]);
+    if (result.length === 0) {
+      throw new Error("Competitor already exists");
     }
+    return result[0];
   }
 
   /**
-   * Update competitor information
+   * Update competitor information (optimized)
    */
   async updateCompetitor(
     competitorId: string,
@@ -141,11 +423,14 @@ export class CompetitorService extends BaseService {
         .from("competitors")
         .update(updates)
         .eq("id", competitorId)
-        .select()
+        .select("*, website_id")
         .single();
 
       if (error) throw error;
 
+      // Clear relevant cache
+      this.clearCache(`competitors_${data.website_id}`);
+      
       return data;
     } catch (error) {
       console.error("Failed to update competitor:", error);
@@ -154,17 +439,24 @@ export class CompetitorService extends BaseService {
   }
 
   /**
-   * Delete/deactivate a competitor
+   * Delete/deactivate a competitor (optimized)
    */
   async deleteCompetitor(competitorId: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .schema("beekon_data")
         .from("competitors")
         .update({ is_active: false })
-        .eq("id", competitorId);
+        .eq("id", competitorId)
+        .select("website_id")
+        .single();
 
       if (error) throw error;
+
+      // Clear relevant cache
+      if (data) {
+        this.clearCache(`competitors_${data.website_id}`);
+      }
     } catch (error) {
       console.error("Failed to delete competitor:", error);
       throw error;
@@ -172,103 +464,7 @@ export class CompetitorService extends BaseService {
   }
 
   /**
-   * Get competitor performance metrics
-   */
-  async getCompetitorPerformance(
-    websiteId: string,
-    dateRange?: { start: string; end: string }
-  ): Promise<CompetitorPerformance[]> {
-    try {
-      const competitors = await this.getCompetitors(websiteId);
-      const performanceData: CompetitorPerformance[] = [];
-
-      for (const competitor of competitors) {
-        // Get analysis results for this competitor domain
-        const competitorResults = await this.getCompetitorAnalysisResults(
-          competitor.competitor_domain,
-          dateRange
-        );
-
-        // Calculate performance metrics
-        const performance = await this.calculateCompetitorMetrics(
-          competitor,
-          competitorResults
-        );
-
-        performanceData.push(performance);
-      }
-
-      return performanceData.sort((a, b) => b.shareOfVoice - a.shareOfVoice);
-    } catch (error) {
-      console.error("Failed to get competitor performance:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get competitive analysis comparing your brand with competitors
-   */
-  async getCompetitiveAnalysis(
-    websiteId: string,
-    dateRange?: { start: string; end: string }
-  ): Promise<CompetitorAnalytics> {
-    try {
-      const [competitors, yourBrandResults] = await Promise.all([
-        this.getCompetitorPerformance(websiteId, dateRange),
-        this.getAnalysisResultsForWebsite(websiteId, dateRange),
-      ]);
-
-      // Calculate your brand's metrics
-      const yourBrandMetrics = await this.getDashboardMetricsForWebsite(
-        websiteId,
-        dateRange
-      );
-
-      // Generate market share data
-      const marketShareData = [
-        {
-          name: "Your Brand",
-          value: yourBrandMetrics.overallVisibilityScore,
-        },
-        ...competitors.map((comp) => ({
-          name: comp.name,
-          value: comp.shareOfVoice,
-          competitorId: comp.competitorId,
-        })),
-      ];
-
-      // Generate competitive gap analysis
-      const competitiveGaps = await this.calculateCompetitiveGaps(
-        websiteId,
-        competitors,
-        yourBrandResults
-      );
-
-      // Generate time series data
-      const timeSeriesData = await this.getCompetitorTimeSeriesData(
-        websiteId,
-        competitors,
-        dateRange
-      );
-
-      return {
-        totalCompetitors: competitors.length,
-        activeCompetitors: competitors.filter((c) => c.isActive).length,
-        averageCompetitorRank:
-          competitors.reduce((sum, c) => sum + c.averageRank, 0) /
-          competitors.length,
-        marketShareData,
-        competitiveGaps,
-        timeSeriesData,
-      };
-    } catch (error) {
-      console.error("Failed to get competitive analysis:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Export competitor data
+   * Export competitor data (optimized)
    */
   async exportCompetitorData(
     websiteId: string,
@@ -276,6 +472,7 @@ export class CompetitorService extends BaseService {
     dateRange?: { start: string; end: string }
   ): Promise<Blob> {
     try {
+      // Use parallel execution for better performance
       const [competitors, analytics] = await Promise.all([
         this.getCompetitorPerformance(websiteId, dateRange),
         this.getCompetitiveAnalysis(websiteId, dateRange),
@@ -288,170 +485,69 @@ export class CompetitorService extends BaseService {
         dateRange,
       };
 
-      if (format === "json") {
-        return new Blob([JSON.stringify(exportData, null, 2)], {
-          type: "application/json",
-        });
+      switch (format) {
+        case "json":
+          return new Blob([JSON.stringify(exportData, null, 2)], {
+            type: "application/json",
+          });
+        case "csv":
+          return new Blob([this.convertToCSV(exportData)], { 
+            type: "text/csv" 
+          });
+        case "pdf":
+          // For PDF, return JSON for now (would need PDF library integration)
+          return new Blob([JSON.stringify(exportData, null, 2)], {
+            type: "application/json",
+          });
+        default:
+          throw new Error(`Unsupported format: ${format}`);
       }
-
-      if (format === "csv") {
-        const csvContent = this.convertToCSV(exportData);
-        return new Blob([csvContent], { type: "text/csv" });
-      }
-
-      // For PDF, return JSON for now (would need PDF library integration)
-      return new Blob([JSON.stringify(exportData, null, 2)], {
-        type: "application/json",
-      });
     } catch (error) {
       console.error("Failed to export competitor data:", error);
       throw error;
     }
   }
 
-  private async getCompetitorAnalysisResults(
-    domain: string,
-    dateRange?: { start: string; end: string }
-  ): Promise<AnalysisResult[]> {
-    // This would typically search for analysis results that mention the competitor domain
-    // For now, we'll simulate this by searching for prompts that contain the domain
+  /**
+   * Refresh materialized views (for real-time updates)
+   */
+  async refreshCompetitorViews(): Promise<void> {
     try {
-      let query = supabase
-        .schema("beekon_data")
-        .from("llm_analysis_results")
-        .select(
-          `
-          *,
-          prompts!inner (
-            prompt_text,
-            topics!inner (
-              topic_name,
-              website_id
-            )
-          )
-        `
-        )
-        .ilike("response_text", `%${domain}%`)
-        .order("created_at", { ascending: false });
-
-      if (dateRange) {
-        query = query
-          .gte("created_at", dateRange.start)
-          .lte("created_at", dateRange.end);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Transform data to match AnalysisResult format
-      const resultsMap = new Map<string, AnalysisResult>();
-
-      data?.forEach((row) => {
-        const promptId = row.prompt_id;
-        const prompt = row.prompts as {
-          prompt_text: string;
-          topics: { topic_name: string; website_id: string };
-        };
-
-        if (!resultsMap.has(promptId)) {
-          resultsMap.set(promptId, {
-            id: promptId,
-            prompt: prompt.prompt_text,
-            website_id: prompt.topics.website_id,
-            topic: prompt.topics.topic_name,
-            status: "completed",
-            confidence: row.confidence_score || 0,
-            created_at: row.created_at || "",
-            updated_at: row.created_at || "",
-            llm_results: [],
-          });
-        }
-
-        const result = resultsMap.get(promptId)!;
-        result.llm_results.push({
-          id: row.id,
-          llm_provider: row.llm_provider,
-          is_mentioned: row.is_mentioned || false,
-          rank_position: row.rank_position,
-          sentiment_score: row.sentiment_score,
-          response_text: row.response_text,
-          confidence_score: row.confidence_score,
-          analyzed_at: row.analyzed_at || row.created_at || "",
-        });
-      });
-
-      return Array.from(resultsMap.values());
+      await supabase.rpc('refresh_competitor_performance_views');
+      // Clear all cache after refresh
+      this.clearCache();
     } catch (error) {
-      console.error("Failed to get competitor analysis results:", error);
-      return [];
+      console.error("Failed to refresh competitor views:", error);
+      throw error;
     }
   }
 
-  private async calculateCompetitorMetrics(
-    competitor: Competitor,
-    results: AnalysisResult[]
-  ): Promise<CompetitorPerformance> {
-    const allLLMResults = results.flatMap((r) => r.llm_results);
-    const mentionedResults = allLLMResults.filter((r) => r.is_mentioned);
+  // Private helper methods
 
-    const shareOfVoice =
-      allLLMResults.length > 0
-        ? Math.round((mentionedResults.length / allLLMResults.length) * 100)
-        : 0;
-
-    const rankedResults = mentionedResults.filter(
-      (r) => r.rank_position !== null
-    );
-    const averageRank =
-      rankedResults.length > 0
-        ? Math.round(
-            (rankedResults.reduce((sum, r) => sum + (r.rank_position || 0), 0) /
-              rankedResults.length) *
-              10
-          ) / 10
-        : 0;
-
-    const sentimentResults = allLLMResults.filter(
-      (r) => r.sentiment_score !== null
-    );
-    const sentimentScore =
-      sentimentResults.length > 0
-        ? Math.round(
-            ((sentimentResults.reduce(
-              (sum, r) => sum + (r.sentiment_score || 0),
-              0
-            ) /
-              sentimentResults.length) +
-              1) *
-              50
-          )
-        : 0;
-
-    // Calculate trend (simplified - would need historical data)
-    const trend: "up" | "down" | "stable" = "stable";
-    const trendPercentage = 0;
-
-    return {
-      competitorId: competitor.id,
-      domain: competitor.competitor_domain,
-      name: competitor.competitor_name || competitor.competitor_domain,
-      shareOfVoice,
-      averageRank,
-      mentionCount: mentionedResults.length,
-      sentimentScore,
-      visibilityScore: shareOfVoice,
-      trend,
-      trendPercentage,
-      lastAnalyzed: results.length > 0 ? results[0]!.created_at : "",
-      isActive: competitor.is_active,
-    };
+  private calculateTrend(trendValue: number | null): "up" | "down" | "stable" {
+    if (!trendValue) return "stable";
+    if (trendValue > 5) return "up";
+    if (trendValue < -5) return "down";
+    return "stable";
   }
 
-  private async calculateCompetitiveGaps(
-    websiteId: string,
+  private calculateBrandMetrics(results: AnalysisResult[]): { overallVisibilityScore: number } {
+    if (results.length === 0) return { overallVisibilityScore: 0 };
+
+    const allLLMResults = results.flatMap(r => r.llm_results);
+    const mentionedResults = allLLMResults.filter(r => r.is_mentioned);
+    
+    const overallVisibilityScore = Math.round(
+      (mentionedResults.length / Math.max(allLLMResults.length, 1)) * 100
+    );
+
+    return { overallVisibilityScore };
+  }
+
+  private calculateCompetitiveGaps(
     competitors: CompetitorPerformance[],
     yourBrandResults: AnalysisResult[]
-  ): Promise<CompetitorComparison[]> {
+  ): CompetitorComparison[] {
     // Group your brand's results by topic
     const topicMap = new Map<string, number>();
     
@@ -476,46 +572,12 @@ export class CompetitorService extends BaseService {
         competitors: competitors.slice(0, 3).map((comp) => ({
           competitorId: comp.competitorId,
           name: comp.name,
-          score: Math.round(comp.shareOfVoice * 0.8 + Math.random() * 0.4), // Simulated
+          score: Math.round(comp.shareOfVoice * 0.8 + Math.random() * 0.4), // Would need real competitor topic analysis
         })),
       });
     });
 
     return gaps;
-  }
-
-  private async getCompetitorTimeSeriesData(
-    websiteId: string,
-    competitors: CompetitorPerformance[],
-    dateRange?: { start: string; end: string }
-  ): Promise<CompetitorTimeSeriesData[]> {
-    // This would generate time series data for competitors
-    // For now, we'll simulate daily data for the past 30 days
-    const days = 30;
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - days);
-
-    const timeSeriesData: CompetitorTimeSeriesData[] = [];
-
-    for (let i = 0; i < days; i++) {
-      const currentDate = new Date(startDate);
-      currentDate.setDate(startDate.getDate() + i);
-
-      timeSeriesData.push({
-        date: currentDate.toISOString().split('T')[0]!,
-        competitors: competitors.map((comp) => ({
-          competitorId: comp.competitorId,
-          name: comp.name,
-          shareOfVoice: comp.shareOfVoice + Math.random() * 10 - 5, // Simulated variation
-          averageRank: comp.averageRank + Math.random() * 0.5 - 0.25,
-          mentionCount: Math.max(0, comp.mentionCount + Math.floor(Math.random() * 6) - 3),
-          sentimentScore: comp.sentimentScore + Math.random() * 20 - 10,
-        })),
-      });
-    }
-
-    return timeSeriesData;
   }
 
   private convertToCSV(data: {
@@ -564,102 +626,169 @@ export class CompetitorService extends BaseService {
   }
 
   /**
-   * Get analysis results for a website directly from database
+   * Get analysis results for a website (optimized with better query)
    */
   private async getAnalysisResultsForWebsite(
     websiteId: string,
     dateRange?: { start: string; end: string }
   ): Promise<AnalysisResult[]> {
-    return this.executeOperation('getAnalysisResultsForWebsite', async () => {
-      let query = supabase
-        .schema("beekon_data")
-        .from("llm_analysis_results")
-        .select(`
-          *,
-          prompts (*)
-        `)
-        .eq("website_id", websiteId);
+    // Use a more efficient query with proper joins
+    let query = supabase
+      .schema("beekon_data")
+      .from("llm_analysis_results")
+      .select(`
+        *,
+        prompts!inner (
+          prompt_text,
+          topics!inner (
+            topic_name,
+            topic_keywords,
+            website_id
+          )
+        )
+      `)
+      .eq("website_id", websiteId)
+      .order("analyzed_at", { ascending: false });
 
-      if (dateRange) {
-        query = query
-          .gte("analyzed_at", dateRange.start)
-          .lte("analyzed_at", dateRange.end);
+    if (dateRange) {
+      query = query
+        .gte("analyzed_at", dateRange.start)
+        .lte("analyzed_at", dateRange.end);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Efficiently transform data
+    const resultsMap = new Map<string, AnalysisResult>();
+    
+    data?.forEach((row) => {
+      const topic = row.prompts?.topics;
+      if (!topic) return;
+
+      const topicName = topic.topic_name;
+      
+      if (!resultsMap.has(topicName)) {
+        resultsMap.set(topicName, {
+          topic_name: topicName,
+          topic_keywords: topic.topic_keywords || [],
+          llm_results: [],
+          total_mentions: 0,
+          avg_rank: null,
+          avg_confidence: null,
+          avg_sentiment: null,
+        });
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Transform the data to match AnalysisResult format
-      const resultsMap = new Map<string, AnalysisResult>();
-      
-      data?.forEach((result) => {
-        const topicName = result.prompts?.topic_name || 'Unknown Topic';
-        const topicKeywords = result.prompts?.topic_keywords || [];
-        
-        if (!resultsMap.has(topicName)) {
-          resultsMap.set(topicName, {
-            topic_name: topicName,
-            topic_keywords: topicKeywords,
-            llm_results: [],
-            total_mentions: 0,
-            avg_rank: null,
-            avg_confidence: null,
-            avg_sentiment: null,
-          });
-        }
-
-        const analysisResult = resultsMap.get(topicName)!;
-        analysisResult.llm_results.push({
-          llm_provider: result.llm_provider,
-          is_mentioned: result.is_mentioned || false,
-          rank_position: result.rank_position,
-          confidence_score: result.confidence_score,
-          sentiment_score: result.sentiment_score,
-          summary_text: result.summary_text,
-          response_text: result.response_text,
-          analyzed_at: result.analyzed_at || new Date().toISOString(),
-        });
+      const analysisResult = resultsMap.get(topicName)!;
+      analysisResult.llm_results.push({
+        llm_provider: row.llm_provider,
+        is_mentioned: row.is_mentioned || false,
+        rank_position: row.rank_position,
+        confidence_score: row.confidence_score,
+        sentiment_score: row.sentiment_score,
+        summary_text: row.summary_text,
+        response_text: row.response_text,
+        analyzed_at: row.analyzed_at || new Date().toISOString(),
       });
+    });
 
-      return Array.from(resultsMap.values());
+    return Array.from(resultsMap.values());
+  }
+
+  /**
+   * Trigger competitor analysis for new LLM responses
+   */
+  async analyzeCompetitorsInResponse(
+    websiteId: string,
+    promptId: string,
+    llmProvider: string,
+    responseText: string
+  ): Promise<void> {
+    try {
+      // Get all active competitors for this website
+      const competitors = await this.getCompetitors(websiteId);
+      
+      if (competitors.length === 0) {
+        return; // No competitors to analyze
+      }
+
+      // Create response map for batch analysis
+      const responseTextMap = new Map<string, string>();
+      responseTextMap.set(promptId, responseText);
+
+      // Analyze all competitors for this response
+      await competitorAnalysisService.batchAnalyzeCompetitors(
+        websiteId,
+        competitors.map(c => c.id),
+        [promptId],
+        llmProvider,
+        responseTextMap
+      );
+
+      // Clear cache to ensure fresh data on next request
+      this.clearCache();
+    } catch (error) {
+      console.error('Error analyzing competitors in response:', error);
+      // Don't throw - this is a background operation
+    }
+  }
+
+  /**
+   * Get enhanced share of voice data
+   */
+  async getEnhancedShareOfVoice(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<CompetitorShareOfVoice[]> {
+    const cacheKey = `enhanced_sov_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      return competitorAnalysisService.getCompetitorShareOfVoice(websiteId, dateRange);
     });
   }
 
   /**
-   * Get dashboard metrics for a website directly from database
+   * Get enhanced competitive gap analysis
    */
-  private async getDashboardMetricsForWebsite(
+  async getEnhancedCompetitiveGaps(
     websiteId: string,
     dateRange?: { start: string; end: string }
-  ): Promise<{ overallVisibilityScore: number }> {
-    return this.executeOperation('getDashboardMetricsForWebsite', async () => {
-      let query = supabase
-        .schema("beekon_data")
-        .from("llm_analysis_results")
-        .select("is_mentioned, rank_position, confidence_score, sentiment_score")
-        .eq("website_id", websiteId);
-
-      if (dateRange) {
-        query = query
-          .gte("analyzed_at", dateRange.start)
-          .lte("analyzed_at", dateRange.end);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
-        return { overallVisibilityScore: 0 };
-      }
-
-      const mentionedResults = data.filter(result => result.is_mentioned);
-      const overallVisibilityScore = Math.round(
-        (mentionedResults.length / data.length) * 100
-      );
-
-      return { overallVisibilityScore };
+  ): Promise<CompetitiveGapAnalysis[]> {
+    const cacheKey = `enhanced_gaps_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      return competitorAnalysisService.getCompetitiveGapAnalysis(websiteId, dateRange);
     });
+  }
+
+  /**
+   * Get competitor insights
+   */
+  async getCompetitorInsights(
+    websiteId: string,
+    dateRange?: { start: string; end: string }
+  ): Promise<CompetitorInsight[]> {
+    const cacheKey = `insights_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
+    
+    return this.getCachedData(cacheKey, async () => {
+      return competitorAnalysisService.getCompetitorInsights(websiteId, dateRange);
+    });
+  }
+
+  /**
+   * Refresh all competitor analysis data
+   */
+  async refreshCompetitorAnalysis(): Promise<void> {
+    try {
+      await competitorAnalysisService.refreshCompetitorAnalysisViews();
+      this.clearCache(); // Clear all cached data
+    } catch (error) {
+      console.error('Error refreshing competitor analysis:', error);
+      throw error;
+    }
   }
 }
 
-export const competitorService = CompetitorService.getInstance();
+// Export the optimized service as the default
+export const competitorService = OptimizedCompetitorService.getInstance();

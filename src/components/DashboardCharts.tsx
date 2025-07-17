@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Card,
   CardContent,
@@ -30,7 +31,7 @@ interface LLMPerformanceChartProps {
   llmData: LLMPerformance[];
 }
 
-export function LLMPerformanceChart({ llmData }: LLMPerformanceChartProps) {
+export const LLMPerformanceChart = React.memo(({ llmData }: LLMPerformanceChartProps) => {
   const colors = {
     ChatGPT: "#10B981", // green
     Claude: "#F59E0B", // orange  
@@ -74,13 +75,13 @@ export function LLMPerformanceChart({ llmData }: LLMPerformanceChartProps) {
       </CardContent>
     </Card>
   );
-}
+});
 
 interface WebsitePerformanceChartProps {
   websiteData: WebsitePerformance[];
 }
 
-export function WebsitePerformanceChart({ websiteData }: WebsitePerformanceChartProps) {
+export const WebsitePerformanceChart = React.memo(({ websiteData }: WebsitePerformanceChartProps) => {
   const topWebsites = websiteData.slice(0, 5); // Show top 5 websites
 
   return (
@@ -117,13 +118,13 @@ export function WebsitePerformanceChart({ websiteData }: WebsitePerformanceChart
       </CardContent>
     </Card>
   );
-}
+});
 
 interface SentimentDistributionChartProps {
   sentimentData: { name: string; value: number; color: string }[];
 }
 
-export function SentimentDistributionChart({ sentimentData }: SentimentDistributionChartProps) {
+export const SentimentDistributionChart = React.memo(({ sentimentData }: SentimentDistributionChartProps) => {
   const COLORS = ['#10B981', '#F59E0B', '#EF4444']; // green, orange, red
 
   return (
@@ -157,7 +158,7 @@ export function SentimentDistributionChart({ sentimentData }: SentimentDistribut
       </CardContent>
     </Card>
   );
-}
+});
 
 interface MentionTrendChartProps {
   trendData: Array<{
@@ -167,7 +168,7 @@ interface MentionTrendChartProps {
   }>;
 }
 
-export function MentionTrendChart({ trendData }: MentionTrendChartProps) {
+export const MentionTrendChart = React.memo(({ trendData }: MentionTrendChartProps) => {
   return (
     <Card>
       <CardHeader>
@@ -212,7 +213,7 @@ export function MentionTrendChart({ trendData }: MentionTrendChartProps) {
       </CardContent>
     </Card>
   );
-}
+});
 
 interface TopicRadarChartProps {
   topicData: Array<{
@@ -223,7 +224,7 @@ interface TopicRadarChartProps {
   }>;
 }
 
-export function TopicRadarChart({ topicData }: TopicRadarChartProps) {
+export const TopicRadarChart = React.memo(({ topicData }: TopicRadarChartProps) => {
   // Transform data for radar chart
   const radarData = topicData.slice(0, 6).map(topic => ({
     topic: topic.topic.substring(0, 15) + (topic.topic.length > 15 ? '...' : ''),
@@ -272,7 +273,7 @@ export function TopicRadarChart({ topicData }: TopicRadarChartProps) {
       </CardContent>
     </Card>
   );
-}
+});
 
 interface QuickStatsProps {
   stats: {
@@ -283,7 +284,7 @@ interface QuickStatsProps {
   };
 }
 
-export function QuickStats({ stats }: QuickStatsProps) {
+export const QuickStats = React.memo(({ stats }: QuickStatsProps) => {
   const statCards = [
     {
       title: "Websites Tracked",
@@ -320,4 +321,4 @@ export function QuickStats({ stats }: QuickStatsProps) {
       ))}
     </div>
   );
-}
+});
