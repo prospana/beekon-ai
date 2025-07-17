@@ -380,7 +380,11 @@ export default function Analysis() {
       {llmResult?.is_mentioned ? (
         <div className="space-y-1">
           <Check className="h-5 w-5 text-success mx-auto" />
-          <div className="text-xs font-medium">#{llmResult.rank_position}</div>
+          <div className="text-xs font-medium">
+            {llmResult.rank_position !== 0
+              ? `#${llmResult.rank_position}`
+              : "Not Ranked"}
+          </div>
           {getSentimentBadgeFromScore(llmResult.sentiment_score)}
         </div>
       ) : (
