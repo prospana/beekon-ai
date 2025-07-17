@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { useCompetitors } from "@/hooks/useCompetitors";
@@ -14,6 +14,8 @@ import TimeSeriesChart from "@/components/competitors/TimeSeriesChart";
 import CompetitorsEmptyState from "@/components/competitors/CompetitorsEmptyState";
 import NoAnalyticsState from "@/components/competitors/NoAnalyticsState";
 import CompetitorInsights from "@/components/competitors/CompetitorInsights";
+import { sendN8nWebhook } from "@/lib/http-request";
+import { addProtocol } from "@/lib/utils";
 
 export default function Competitors() {
   const {
@@ -27,6 +29,7 @@ export default function Competitors() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [competitorDomain, setCompetitorDomain] = useState("");
   const [competitorName, setCompetitorName] = useState("");
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [competitorToDelete, setCompetitorToDelete] = useState<string | null>(
@@ -38,8 +41,15 @@ export default function Competitors() {
   >("shareOfVoice");
   const [isExporting, setIsExporting] = useState(false);
 
-  // Get first website ID for competitor tracking
+  // Get first website ID for competitor tracking (fallback)
   const websiteId = websites?.[0]?.id;
+
+  // Initialize selectedWebsiteId when websites are loaded
+  React.useEffect(() => {
+    if (websites && websites.length > 0 && !selectedWebsiteId) {
+      setSelectedWebsiteId(websites[0].id);
+    }
+  }, [websites, selectedWebsiteId]);
 
   // Calculate date range (memoized to prevent infinite re-renders)
   const dateRange = useMemo(() => {
@@ -66,7 +76,7 @@ export default function Competitors() {
     refreshData,
     clearError,
     hasData,
-  } = useCompetitors(websiteId, {
+  } = useCompetitors(selectedWebsiteId, {
     dateRange,
     sortBy,
     sortOrder: "desc",
@@ -74,29 +84,33 @@ export default function Competitors() {
 
   // Prepare chart data from analytics (memoized to prevent unnecessary recalculations)
   const shareOfVoiceData = useMemo(() => {
-    return analytics?.marketShareData.map((item) => ({
-      name: item.name,
-      value: item.value,
-      fill:
-        item.name === "Your Brand"
-          ? "hsl(var(--primary))"
-          : item.competitorId
-          ? `hsl(var(--chart-${(item.competitorId.length % 4) + 2}))`
-          : "hsl(var(--muted))",
-    })) || [];
+    return (
+      analytics?.marketShareData.map((item) => ({
+        name: item.name,
+        value: item.value,
+        fill:
+          item.name === "Your Brand"
+            ? "hsl(var(--primary))"
+            : item.competitorId
+            ? `hsl(var(--chart-${(item.competitorId.length % 4) + 2}))`
+            : "hsl(var(--muted))",
+      })) || []
+    );
   }, [analytics?.marketShareData]);
 
   const competitiveGapData = useMemo(() => {
-    return analytics?.competitiveGaps.map((gap) => {
-      const data: Record<string, number | string> = {
-        topic: gap.topic,
-        yourBrand: gap.yourBrand,
-      };
-      gap.competitors.forEach((comp, index) => {
-        data[`competitor${index + 1}`] = comp.score;
-      });
-      return data;
-    }) || [];
+    return (
+      analytics?.competitiveGaps.map((gap) => {
+        const data: Record<string, number | string> = {
+          topic: gap.topic,
+          yourBrand: gap.yourBrand,
+        };
+        gap.competitors.forEach((comp, index) => {
+          data[`competitor${index + 1}`] = comp.score;
+        });
+        return data;
+      }) || []
+    );
   }, [analytics?.competitiveGaps]);
 
   // Competitor insights refresh handler
@@ -105,6 +119,15 @@ export default function Competitors() {
   };
 
   const handleAddCompetitor = async () => {
+    if (!websites || websites.length === 0) {
+      toast({
+        title: "Error",
+        description: "No websites available. Please add a website first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!competitorDomain.trim()) {
       toast({
         title: "Error",
@@ -114,30 +137,76 @@ export default function Competitors() {
       return;
     }
 
-    if (!websiteId) {
+    if (!selectedWebsiteId) {
       toast({
         title: "Error",
-        description: "No website selected for competitor tracking",
+        description: "Please select a website for competitor tracking",
         variant: "destructive",
       });
       return;
     }
 
-    setIsAdding(true);
-    try {
-      await addCompetitor(
-        competitorDomain.trim(),
-        competitorName.trim() || undefined
-      );
-
-      setCompetitorDomain("");
-      setCompetitorName("");
-      setIsAddDialogOpen(false);
-    } catch (error) {
-      // Error is already handled by the hook
-    } finally {
-      setIsAdding(false);
+    // Validate that the selected website exists and is available
+    const selectedWebsite = websites?.find((w) => w.id === selectedWebsiteId);
+    if (!selectedWebsite) {
+      toast({
+        title: "Error",
+        description: "Selected website is no longer available",
+        variant: "destructive",
+      });
+      return;
     }
+
+    // Optionally warn if website is inactive (but allow it)
+    if (!selectedWebsite.is_active) {
+      toast({
+        title: "Warning",
+        description: "You're adding a competitor to an inactive website",
+        variant: "default",
+      });
+    }
+    setIsAdding(true);
+
+    // Validate domain format
+    const domainRegex =
+      /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(\/.*)?$/i;
+
+    if (!domainRegex.test(competitorDomain)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid domain name",
+        variant: "destructive",
+      });
+      setIsAdding(false);
+      return;
+    }
+
+    const response = await sendN8nWebhook("webhook/competitors-onboarding", {
+      website_id: selectedWebsite.id,
+      website_name: selectedWebsite.display_name,
+      website_url: selectedWebsite.domain,
+      competitors_url: addProtocol(competitorDomain),
+      display_name: competitorName,
+      workspace_id: currentWorkspace?.id,
+    });
+
+    if (!response.success) {
+      toast({
+        title: "Error",
+        description: "Failed to crawl competitor's website.",
+        variant: "destructive",
+      });
+      setIsAdding(false);
+      return;
+    }
+
+    // Here you would typically make an API call to add the website
+    toast({
+      title: "Competitor's Website added!",
+      description: `Competitors Analysis started for ${competitorDomain}`,
+    });
+
+    setIsAdding(false);
   };
 
   const handleDeleteCompetitor = async (competitorId: string) => {
@@ -210,12 +279,16 @@ export default function Competitors() {
           isAddDialogOpen={isAddDialogOpen}
           competitorDomain={competitorDomain}
           competitorName={competitorName}
+          selectedWebsiteId={selectedWebsiteId}
           isAdding={isAdding}
+          websites={websites || []}
+          websitesLoading={workspaceLoading}
           setDateFilter={setDateFilter}
           setSortBy={setSortBy}
           setIsAddDialogOpen={setIsAddDialogOpen}
           setCompetitorDomain={setCompetitorDomain}
           setCompetitorName={setCompetitorName}
+          setSelectedWebsiteId={setSelectedWebsiteId}
           refreshData={refreshData}
           handleExportData={handleExportData}
           handleAddCompetitor={handleAddCompetitor}

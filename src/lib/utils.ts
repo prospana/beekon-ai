@@ -13,3 +13,9 @@ export function capitalizeFirstLetters(str: string) {
   if (!str) return "";
   return str.replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+// Add `https://` if it doesn't exists
+export function addProtocol(domain: string) {
+  if (!domain.includes("https://")) return "https://" + domain;
+  return domain;
+}

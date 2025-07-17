@@ -33,6 +33,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWorkspace, Website } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
+import { addProtocol } from "@/lib/utils";
 import {
   BarChart3,
   Calendar,
@@ -62,12 +63,6 @@ export default function Websites() {
   const { toast } = useToast();
   const { websites, deleteWebsite, refetchWebsites } = useWorkspace();
   const { workspaceId } = useAuth();
-
-  // Add `https://` if it doesn't exists
-  const addProtocol = (domain: string) => {
-    if (!domain.includes("https://")) return "https://" + domain;
-    return domain;
-  };
 
   useEffect(() => {
     websites?.forEach(async (website) => {

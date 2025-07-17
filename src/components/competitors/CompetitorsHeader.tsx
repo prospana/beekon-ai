@@ -4,7 +4,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Plus, RefreshCw, Download, Filter } from 'lucide-react';
+import { Website } from '@/hooks/useWorkspace';
 
 interface CompetitorsHeaderProps {
   totalCompetitors: number;
@@ -17,12 +19,16 @@ interface CompetitorsHeaderProps {
   isAddDialogOpen: boolean;
   competitorDomain: string;
   competitorName: string;
+  selectedWebsiteId: string;
   isAdding: boolean;
+  websites: Website[];
+  websitesLoading: boolean;
   setDateFilter: (value: '7d' | '30d' | '90d') => void;
   setSortBy: (value: 'shareOfVoice' | 'averageRank' | 'mentionCount' | 'sentimentScore') => void;
   setIsAddDialogOpen: (value: boolean) => void;
   setCompetitorDomain: (value: string) => void;
   setCompetitorName: (value: string) => void;
+  setSelectedWebsiteId: (value: string) => void;
   refreshData: () => void;
   handleExportData: (format: 'csv') => void;
   handleAddCompetitor: () => void;
@@ -39,12 +45,16 @@ export default function CompetitorsHeader({
   isAddDialogOpen,
   competitorDomain,
   competitorName,
+  selectedWebsiteId,
   isAdding,
+  websites,
+  websitesLoading,
   setDateFilter,
   setSortBy,
   setIsAddDialogOpen,
   setCompetitorDomain,
   setCompetitorName,
+  setSelectedWebsiteId,
   refreshData,
   handleExportData,
   handleAddCompetitor,
@@ -131,6 +141,56 @@ export default function CompetitorsHeader({
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="websiteSelect">Website</Label>
+                <Select 
+                  value={selectedWebsiteId} 
+                  onValueChange={setSelectedWebsiteId}
+                  disabled={websitesLoading || websites.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue 
+                      placeholder={
+                        websitesLoading 
+                          ? "Loading websites..." 
+                          : websites.length === 0 
+                            ? "No websites available" 
+                            : "Select a website..."
+                      } 
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {websites.length > 0 ? (
+                      websites.map((website) => (
+                        <SelectItem key={website.id} value={website.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {website.display_name || website.domain}
+                              </span>
+                              {website.display_name && (
+                                <span className="text-sm text-muted-foreground">
+                                  {website.domain}
+                                </span>
+                              )}
+                            </div>
+                            <Badge 
+                              variant={website.is_active ? "default" : "secondary"}
+                              className="ml-2"
+                            >
+                              {website.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        No websites available. Please add a website first.
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="competitorDomain">Competitor Domain</Label>
                 <Input
                   id="competitorDomain"
@@ -162,6 +222,7 @@ export default function CompetitorsHeader({
                 loading={isAdding}
                 loadingText="Adding..."
                 icon={<Plus className="h-4 w-4" />}
+                disabled={isAdding || websites.length === 0 || !selectedWebsiteId}
               >
                 Add Competitor
               </LoadingButton>
