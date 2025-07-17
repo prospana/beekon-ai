@@ -454,8 +454,27 @@ export class OptimizedCompetitorService extends BaseService {
         }
       }
 
-      // Clear cache
+      // Clear all relevant cache for this website
       this.clearCache(`competitors_${websiteId}`);
+      this.clearCache(`performance_${websiteId}`);
+      this.clearCache(`analytics_${websiteId}`);
+      
+      // Clear cache patterns that might contain this website ID
+      for (const key of this.cache.keys()) {
+        if (key.includes(websiteId)) {
+          this.cache.delete(key);
+        }
+      }
+
+      // Refresh materialized views to ensure new competitors appear in analytics
+      try {
+        await this.refreshCompetitorViews();
+        await this.refreshCompetitorAnalysis();
+        console.log(`Materialized views refreshed after adding ${results.length} competitors`);
+      } catch (refreshError) {
+        console.warn("Failed to refresh materialized views after adding competitors:", refreshError);
+        // Don't throw the error to avoid breaking the main operation
+      }
 
       return results;
     } catch (error) {
@@ -514,6 +533,16 @@ export class OptimizedCompetitorService extends BaseService {
       // Clear relevant cache
       this.clearCache(`competitors_${data.website_id}`);
 
+      // Refresh materialized views to ensure updated competitors appear in analytics
+      try {
+        await this.refreshCompetitorViews();
+        await this.refreshCompetitorAnalysis();
+        console.log(`Materialized views refreshed after updating competitor ${competitorId}`);
+      } catch (refreshError) {
+        console.warn("Failed to refresh materialized views after updating competitor:", refreshError);
+        // Don't throw the error to avoid breaking the main operation
+      }
+
       return data;
     } catch (error) {
       console.error("Failed to update competitor:", error);
@@ -539,6 +568,16 @@ export class OptimizedCompetitorService extends BaseService {
       // Clear relevant cache
       if (data) {
         this.clearCache(`competitors_${data.website_id}`);
+        
+        // Refresh materialized views to ensure deleted competitors are removed from analytics
+        try {
+          await this.refreshCompetitorViews();
+          await this.refreshCompetitorAnalysis();
+          console.log(`Materialized views refreshed after deleting competitor ${competitorId}`);
+        } catch (refreshError) {
+          console.warn("Failed to refresh materialized views after deleting competitor:", refreshError);
+          // Don't throw the error to avoid breaking the main operation
+        }
       }
     } catch (error) {
       console.error("Failed to delete competitor:", error);

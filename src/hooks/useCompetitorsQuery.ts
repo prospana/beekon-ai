@@ -135,10 +135,14 @@ export function useAddCompetitor() {
     mutationFn: ({ websiteId, domain, name }: { websiteId: string; domain: string; name?: string }) =>
       competitorService.addCompetitor(websiteId, domain, name),
     onSuccess: (data, variables) => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: competitorKeys.list(variables.websiteId) });
-      queryClient.invalidateQueries({ queryKey: competitorKeys.performance(variables.websiteId) });
-      queryClient.invalidateQueries({ queryKey: competitorKeys.analytics(variables.websiteId) });
+      // Invalidate all related queries for this website
+      queryClient.invalidateQueries({ 
+        queryKey: competitorKeys.all,
+        predicate: (query) => {
+          // Invalidate any competitor-related query for this website
+          return query.queryKey.includes(variables.websiteId);
+        }
+      });
       
       toast({
         title: "Competitor added",
@@ -171,10 +175,14 @@ export function useUpdateCompetitor() {
     }) =>
       competitorService.updateCompetitor(competitorId, updates),
     onSuccess: (data, variables) => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: competitorKeys.list(variables.websiteId) });
-      queryClient.invalidateQueries({ queryKey: competitorKeys.performance(variables.websiteId) });
-      queryClient.invalidateQueries({ queryKey: competitorKeys.analytics(variables.websiteId) });
+      // Invalidate all related queries for this website
+      queryClient.invalidateQueries({ 
+        queryKey: competitorKeys.all,
+        predicate: (query) => {
+          // Invalidate any competitor-related query for this website
+          return query.queryKey.includes(variables.websiteId);
+        }
+      });
       
       toast({
         title: "Competitor updated",
@@ -199,10 +207,14 @@ export function useDeleteCompetitor() {
     mutationFn: ({ competitorId, websiteId }: { competitorId: string; websiteId: string }) =>
       competitorService.deleteCompetitor(competitorId),
     onSuccess: (data, variables) => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: competitorKeys.list(variables.websiteId) });
-      queryClient.invalidateQueries({ queryKey: competitorKeys.performance(variables.websiteId) });
-      queryClient.invalidateQueries({ queryKey: competitorKeys.analytics(variables.websiteId) });
+      // Invalidate all related queries for this website
+      queryClient.invalidateQueries({ 
+        queryKey: competitorKeys.all,
+        predicate: (query) => {
+          // Invalidate any competitor-related query for this website
+          return query.queryKey.includes(variables.websiteId);
+        }
+      });
       
       toast({
         title: "Competitor removed",
