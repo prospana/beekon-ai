@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useProfile } from '@/hooks/useProfile';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,12 +9,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SidebarTrigger } from '@/components/ui/sidebar';
-import { ProfileModal } from '@/components/ProfileModal';
-import { WorkspaceDropdown } from '@/components/WorkspaceDropdown';
-import { LogOut, User, Settings } from 'lucide-react';
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ProfileModal } from "@/components/ProfileModal";
+import { WorkspaceDropdown } from "@/components/WorkspaceDropdown";
+import { LogOut, User, Settings } from "lucide-react";
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
@@ -32,7 +32,10 @@ export function AppHeader() {
           <WorkspaceDropdown />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
+              <Button
+                variant="ghost"
+                className="relative h-9 w-9 rounded-full p-0"
+              >
                 <Avatar className="h-9 w-9">
                   {profile?.avatar_url ? (
                     <AvatarImage src={profile.avatar_url} alt="Profile" />
@@ -71,7 +74,7 @@ export function AppHeader() {
           </DropdownMenu>
         </div>
       </header>
-      
+
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => {
