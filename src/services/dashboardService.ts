@@ -550,7 +550,7 @@ export class DashboardService {
    */
   async exportDashboardData(
     websiteIds: string[],
-    format: "pdf" | "csv" | "json"
+    format: "pdf" | "csv" | "json" | "excel" | "word"
   ): Promise<Blob> {
     try {
       const [metrics, timeSeriesData, topicPerformance] = await Promise.all([
@@ -560,28 +560,35 @@ export class DashboardService {
       ]);
 
       const exportData = {
-        metrics,
-        timeSeriesData,
-        topicPerformance,
+        title: "Dashboard Analytics Report",
+        data: {
+          metrics,
+          timeSeriesData,
+          topicPerformance,
+          summary: {
+            websiteCount: websiteIds.length,
+            totalTopics: topicPerformance.length,
+            analysisPoints: timeSeriesData.length,
+            avgVisibilityScore: metrics.visibilityScore,
+            avgSentimentScore: metrics.sentimentScore,
+          },
+        },
         exportedAt: new Date().toISOString(),
-        websiteCount: websiteIds.length,
+        totalRecords: timeSeriesData.length + topicPerformance.length,
+        metadata: {
+          exportType: "dashboard_analytics",
+          generatedBy: "Beekon AI Dashboard",
+          websiteIds,
+          dateRange: {
+            start: timeSeriesData[0]?.date || new Date().toISOString(),
+            end: timeSeriesData[timeSeriesData.length - 1]?.date || new Date().toISOString(),
+          },
+        },
       };
 
-      if (format === "json") {
-        return new Blob([JSON.stringify(exportData, null, 2)], {
-          type: "application/json",
-        });
-      }
-
-      if (format === "csv") {
-        const csvContent = this.convertToCSV(exportData);
-        return new Blob([csvContent], { type: "text/csv" });
-      }
-
-      // For PDF, return JSON for now (would need PDF library integration)
-      return new Blob([JSON.stringify(exportData, null, 2)], {
-        type: "application/json",
-      });
+      // Use enhanced export service for all formats
+      const { exportService } = await import("./exportService");
+      return await exportService.exportData(exportData, format);
     } catch (error) {
       console.error("Failed to export dashboard data:", error);
       throw error;

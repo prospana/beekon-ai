@@ -244,7 +244,8 @@ export class AnalysisService {
         promptStrengths = (prompts?.strengths as string[]) || null;
         promptOpportunities = (prompts?.opportunities as string[]) || null;
         topicName =
-          ((prompts?.topics as Record<string, unknown>)?.topic_name as string) || "Unknown topic";
+          ((prompts?.topics as Record<string, unknown>)
+            ?.topic_name as string) || "Unknown topic";
         resultWebsiteId = row.website_id as string;
       }
 
@@ -299,7 +300,7 @@ export class AnalysisService {
     }
   ): Promise<UIAnalysisResult[]> {
     const { analysisResultsLoader } = await import("./dataLoaders");
-    
+
     try {
       // Use data loader for efficient batching and caching
       const results = await analysisResultsLoader.load({
@@ -312,20 +313,22 @@ export class AnalysisService {
 
       // Apply topic filter
       if (filters?.topic && filters.topic !== "all") {
-        filteredResults = filteredResults.filter(result => 
-          result.topic === filters.topic
+        filteredResults = filteredResults.filter(
+          (result) => result.topic === filters.topic
         );
       }
 
       // Apply LLM provider filter
       if (filters?.llmProvider && filters.llmProvider !== "all") {
         filteredResults = filteredResults
-          .filter(result => 
-            result.llm_results.some(llm => llm.llm_provider === filters.llmProvider)
+          .filter((result) =>
+            result.llm_results.some(
+              (llm) => llm.llm_provider === filters.llmProvider
+            )
           )
-          .map(result => ({
+          .map((result) => ({
             ...result,
-            llm_results: result.llm_results.map(llm => ({
+            llm_results: result.llm_results.map((llm) => ({
               ...llm,
               isFiltered: llm.llm_provider === filters.llmProvider,
             })),
@@ -335,12 +338,13 @@ export class AnalysisService {
       // Apply search query filter
       if (filters?.searchQuery && filters.searchQuery.trim()) {
         const searchTerm = filters.searchQuery.toLowerCase().trim();
-        filteredResults = filteredResults.filter(result =>
-          result.prompt.toLowerCase().includes(searchTerm) ||
-          result.topic.toLowerCase().includes(searchTerm) ||
-          result.llm_results.some(llm => 
-            llm.response_text?.toLowerCase().includes(searchTerm)
-          )
+        filteredResults = filteredResults.filter(
+          (result) =>
+            result.prompt.toLowerCase().includes(searchTerm) ||
+            result.topic.toLowerCase().includes(searchTerm) ||
+            result.llm_results.some((llm) =>
+              llm.response_text?.toLowerCase().includes(searchTerm)
+            )
         );
       }
 
@@ -453,7 +457,10 @@ export class AnalysisService {
           resultCount: count,
         }));
       } catch (fallbackError) {
-        console.error("Fallback LLM providers query also failed:", fallbackError);
+        console.error(
+          "Fallback LLM providers query also failed:",
+          fallbackError
+        );
         return [];
       }
     }

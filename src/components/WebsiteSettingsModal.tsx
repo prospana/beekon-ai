@@ -28,10 +28,13 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { ExportDropdown } from "@/components/ui/export-components";
 import { useToast } from "@/hooks/use-toast";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { websiteSettingsService } from "@/services/websiteSettingsService";
 import type { Website } from "@/types/website";
+import { ExportFormat, useExportHandler } from "@/lib/export-utils";
+import { exportService } from "@/services/exportService";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   BarChart3,
@@ -82,7 +85,9 @@ export function WebsiteSettingsModal({
   const [activeTab, setActiveTab] = useState("general");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { refetchWebsites } = useWorkspace();
+  const { handleExport } = useExportHandler();
 
   const form = useForm<WebsiteSettingsFormData>({
     resolver: zodResolver(websiteSettingsSchema),
@@ -206,25 +211,96 @@ export function WebsiteSettingsModal({
     onClose();
   };
 
+  // Export website settings
+  const handleExportSettings = async (format: ExportFormat) => {
+    if (!website) return;
+    
+    setIsExporting(true);
+    
+    try {
+      const currentSettings = form.getValues();
+      
+      // Prepare settings data for export
+      const settingsData = {
+        website: {
+          id: website.id,
+          domain: website.domain,
+          displayName: website.display_name,
+          isActive: website.is_active,
+          createdAt: website.created_at,
+        },
+        settings: currentSettings,
+        exportedAt: new Date().toISOString(),
+        metadata: {
+          exportType: "website_settings",
+          settingsVersion: "1.0",
+          description: "Website settings backup that can be imported and applied to other websites",
+          compatibleWith: "Beekon AI v1.0+",
+        },
+      };
+
+      const blob = await exportService.exportConfigurationData(
+        settingsData,
+        "website_settings",
+        format
+      );
+
+      const websiteName = website.display_name || website.domain;
+      
+      await handleExport(
+        () => Promise.resolve(blob),
+        {
+          filename: `${websiteName.replace(/[^a-zA-Z0-9]/g, '-')}-settings-backup`,
+          format,
+          includeTimestamp: true,
+          metadata: {
+            websiteId: website.id,
+            websiteName,
+            settingsCount: Object.keys(currentSettings).length,
+            exportType: "website_settings",
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast({
+        title: "Export failed",
+        description: "Failed to export website settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!website) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader className="space-y-3">
-          <DialogTitle className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
-              <Globe className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <div className="text-xl font-semibold">
-                {website.display_name || website.domain}
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center space-x-3">
+              <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
+                <Globe className="h-5 w-5 text-primary" />
               </div>
-              <div className="text-sm text-muted-foreground font-normal">
-                {website.domain}
+              <div>
+                <div className="text-xl font-semibold">
+                  {website.display_name || website.domain}
+                </div>
+                <div className="text-sm text-muted-foreground font-normal">
+                  {website.domain}
+                </div>
               </div>
-            </div>
-          </DialogTitle>
+            </DialogTitle>
+            <ExportDropdown
+              onExport={handleExportSettings}
+              isLoading={isExporting}
+              formats={["json", "csv", "pdf"]}
+              data={form.getValues()}
+              className="ml-4"
+            />
+          </div>
           <DialogDescription>
             Configure monitoring settings and preferences for this website
           </DialogDescription>

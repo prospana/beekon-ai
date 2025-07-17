@@ -21,12 +21,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ExportDropdown } from "@/components/ui/export-components";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
 import {
   analysisService,
   type AnalysisProgress,
 } from "@/services/analysisService";
+import { ExportFormat, useExportHandler } from "@/lib/export-utils";
+import { exportService } from "@/services/exportService";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, CheckCircle, Plus, Search, X, Zap } from "lucide-react";
 import { useState } from "react";
@@ -61,6 +64,7 @@ export function AnalysisConfigModal({
   const { toast } = useToast();
   const { consumeCredit } = useSubscriptionEnforcement();
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [customTopic, setCustomTopic] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [analysisProgress, setAnalysisProgress] =
@@ -68,6 +72,7 @@ export function AnalysisConfigModal({
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(
     null
   );
+  const { handleExport } = useExportHandler();
 
   const availableTopics = [
     "AI Tools",
@@ -244,18 +249,85 @@ export function AnalysisConfigModal({
     }
   };
 
+  // Export current analysis configuration
+  const handleExportConfiguration = async (format: ExportFormat) => {
+    setIsExporting(true);
+    
+    try {
+      const currentConfig = form.getValues();
+      
+      // Prepare configuration data for export
+      const configData = {
+        ...currentConfig,
+        websiteId: websiteId || null,
+        createdAt: new Date().toISOString(),
+        availableTopics,
+        availableLLMs,
+        metadata: {
+          exportType: "analysis_configuration",
+          configVersion: "1.0",
+          description: "Analysis configuration template that can be imported and reused",
+        },
+      };
+
+      const blob = await exportService.exportConfigurationData(
+        configData,
+        "analysis",
+        format
+      );
+
+      const configName = currentConfig.analysisName || "analysis-config";
+      
+      await handleExport(
+        () => Promise.resolve(blob),
+        {
+          filename: `${configName.replace(/[^a-zA-Z0-9]/g, '-')}-template`,
+          format,
+          includeTimestamp: true,
+          metadata: {
+            configType: "analysis",
+            configName,
+            topics: currentConfig.topics.length,
+            llmModels: currentConfig.llmModels.length,
+            customPrompts: currentConfig.customPrompts.length,
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast({
+        title: "Export failed",
+        description: "Failed to export configuration. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-3">
-            <Search className="h-5 w-5" />
-            <span>Configure New Analysis</span>
-          </DialogTitle>
-          <DialogDescription>
-            Set up a new analysis to monitor your brand mentions across AI
-            platforms
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center space-x-3">
+                <Search className="h-5 w-5" />
+                <span>Configure New Analysis</span>
+              </DialogTitle>
+              <DialogDescription>
+                Set up a new analysis to monitor your brand mentions across AI
+                platforms
+              </DialogDescription>
+            </div>
+            <ExportDropdown
+              onExport={handleExportConfiguration}
+              isLoading={isExporting}
+              formats={["json", "csv", "pdf"]}
+              data={form.getValues()}
+              className="ml-4"
+            />
+          </div>
         </DialogHeader>
 
         {/* Progress Tracking */}

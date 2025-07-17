@@ -28,15 +28,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { WebsiteSettingsModal } from "@/components/WebsiteSettingsModal";
+import { ExportDropdown } from "@/components/ui/export-components";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkspace, Website } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { sendN8nWebhook } from "@/lib/http-request";
 import { addProtocol } from "@/lib/utils";
+import { ExportFormat, useExportHandler } from "@/lib/export-utils";
+import { exportService } from "@/services/exportService";
 import {
   BarChart3,
   Calendar,
+  Download,
   Globe,
   MoreHorizontal,
   Play,
@@ -60,9 +64,11 @@ export default function Websites() {
   const [websiteMetrics, setWebsiteMetrics] = useState<
     Record<string, { totalTopics: number; avgVisibility: number }>
   >({});
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const { websites, deleteWebsite, refetchWebsites } = useWorkspace();
   const { workspaceId } = useAuth();
+  const { handleExport } = useExportHandler();
 
   useEffect(() => {
     websites?.forEach(async (website) => {
@@ -249,6 +255,78 @@ export default function Websites() {
     setShowDeleteConfirm(true);
   };
 
+  // Export all websites data
+  const handleExportAllWebsites = async (format: ExportFormat) => {
+    if (!websites || websites.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Add some websites first to export their data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    
+    try {
+      const websiteIds = websites.map(w => w.id);
+      const blob = await exportService.exportWebsiteData(websiteIds, format, {
+        includeMetrics: true,
+        includeAnalysisHistory: true,
+      });
+
+      await handleExport(
+        () => Promise.resolve(blob),
+        {
+          filename: "websites-export",
+          format,
+          includeTimestamp: true,
+          metadata: {
+            websiteCount: websites.length,
+            exportType: "full_website_data",
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Export failed:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Export individual website data
+  const handleExportWebsite = async (websiteId: string, format: ExportFormat) => {
+    setIsExporting(true);
+    
+    try {
+      const blob = await exportService.exportWebsiteData([websiteId], format, {
+        includeMetrics: true,
+        includeAnalysisHistory: true,
+      });
+
+      const website = websites?.find(w => w.id === websiteId);
+      const websiteName = website?.display_name || website?.domain || "website";
+
+      await handleExport(
+        () => Promise.resolve(blob),
+        {
+          filename: `${websiteName.replace(/[^a-zA-Z0-9]/g, '-')}-export`,
+          format,
+          includeTimestamp: true,
+          metadata: {
+            websiteId,
+            websiteName,
+            exportType: "single_website_data",
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Export failed:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -259,14 +337,24 @@ export default function Websites() {
           </p>
         </div>
 
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Website
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+        <div className="flex items-center space-x-2">
+          {websites && websites.length > 0 && (
+            <ExportDropdown
+              onExport={handleExportAllWebsites}
+              isLoading={isExporting}
+              formats={["pdf", "csv", "json", "excel"]}
+              data={websites}
+              showEstimatedSize={true}
+            />
+          )}
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Website
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Website</DialogTitle>
               <DialogDescription>
@@ -310,7 +398,8 @@ export default function Websites() {
               </LoadingButton>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Empty State */}
@@ -448,6 +537,13 @@ export default function Websites() {
                       >
                         <Settings className="h-4 w-4 mr-2" />
                         Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleExportWebsite(website.id, "pdf")}
+                        disabled={isExporting}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Data
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"

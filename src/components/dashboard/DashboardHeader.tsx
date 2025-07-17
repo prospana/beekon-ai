@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { ExportDropdown } from "@/components/ui/export-components";
 import { DashboardMetrics } from "@/hooks/useDashboard";
 import { Workspace } from "@/types/database";
-import { Download, RefreshCw } from "lucide-react";
+import { ExportFormat } from "@/lib/export-utils";
+import { RefreshCw } from "lucide-react";
 
 interface DashboardHeaderProps {
   currentWorkspace: Workspace;
@@ -15,7 +17,7 @@ interface DashboardHeaderProps {
   isExporting: boolean;
   hasData: boolean;
   refreshData: () => void;
-  handleExportData: (format: "pdf" | "csv") => void;
+  handleExportData: (format: ExportFormat) => void;
 }
 
 export function DashboardHeader({
@@ -85,17 +87,14 @@ export function DashboardHeader({
         >
           Refresh
         </LoadingButton>
-        <LoadingButton
-          variant="outline"
-          size="sm"
-          loading={isExporting}
-          loadingText="Exporting..."
-          onClick={() => handleExportData("pdf")}
-          icon={<Download className="h-4 w-4" />}
+        <ExportDropdown
+          onExport={handleExportData}
+          isLoading={isExporting}
           disabled={!hasData}
-        >
-          Export
-        </LoadingButton>
+          formats={["pdf", "csv", "json", "excel", "word"]}
+          data={metrics}
+          showEstimatedSize={true}
+        />
       </div>
     </div>
   );
