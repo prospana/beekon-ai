@@ -7,9 +7,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { BarChart3, Globe, Search, Settings, Users } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -20,17 +21,15 @@ const navigation = [
 ];
 
 export function AppSidebar() {
-  const location = useLocation();
-
+  const { open } = useSidebar();
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-5">
-        <div className="flex items-center space-x-2 max-h-6">
-          <img
-            src="/beekon-transparent-cropped.png"
-            alt="Beekon"
-            className="h-6 w-auto"
-          />
+      <SidebarHeader>
+        <div className="flex items-center space-x-2 max-h-12">
+          <img src="/beekon-favicon.png" alt="Beekon" className="h-12 w-auto" />
+          {open && (
+            <span className="font-semibold text-5xl text-primary">Beekon</span>
+          )}
         </div>
       </SidebarHeader>
 

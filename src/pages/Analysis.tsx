@@ -115,12 +115,10 @@ export default function Analysis() {
         searchQuery: debouncedSearchQuery.trim() || undefined,
       };
 
-
       const results = await analysisService.getAnalysisResults(
         selectedWebsite,
         filters
       );
-
 
       setAnalysisResults(results);
     } catch (error) {
@@ -237,7 +235,7 @@ export default function Analysis() {
     const mentionedCount = filteredResults.filter((r) =>
       r.llm_results.some((llm) => llm.is_mentioned)
     ).length;
-    
+
     const noMentionCount = filteredResults.filter(
       (r) => !r.llm_results.some((llm) => llm.is_mentioned)
     ).length;
@@ -581,7 +579,10 @@ export default function Analysis() {
                       >
                         <div className="flex items-center gap-2">
                           <span>{filter.name}</span>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-default"
+                          >
                             {filter.resultCount}
                           </Badge>
                         </div>
@@ -752,15 +753,11 @@ export default function Analysis() {
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-1">
                     <TrendingUp className="h-4 w-4 text-success" />
-                    <span>
-                      {resultStats.mentionedCount} mentions
-                    </span>
+                    <span>{resultStats.mentionedCount} mentions</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {resultStats.noMentionCount} no mentions
-                    </span>
+                    <span>{resultStats.noMentionCount} no mentions</span>
                   </div>
                 </div>
               </div>
