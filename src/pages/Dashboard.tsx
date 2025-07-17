@@ -28,6 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ExportFormat, useExportHandler } from "@/lib/export-utils";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardMetrics } from "@/hooks/useDashboard";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -66,6 +67,7 @@ export default function Dashboard() {
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [dateFilter, setDateFilter] = useState<"7d" | "30d" | "90d">("7d");
   const [showAllCharts, setShowAllCharts] = useState(false);
+  const { handleExport } = useExportHandler();
   const filters = useMemo(
     () => ({
       period: dateFilter,
@@ -108,7 +110,7 @@ export default function Dashboard() {
     return "neutral";
   };
 
-  const handleExportData = async (format: "pdf" | "csv") => {
+  const handleExportData = async (format: ExportFormat) => {
     if (!hasData || websiteIds.length === 0) {
       toast({
         title: "No data to export",
@@ -120,32 +122,27 @@ export default function Dashboard() {
 
     setIsExporting(true);
     try {
-      // Create real export using dashboard service
+      // Create real export using dashboard service with enhanced formats
       const blob = await dashboardService.exportDashboardData(
         websiteIds,
         format
       );
 
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `dashboard-${Date.now()}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Export successful",
-        description: `Dashboard data exported as ${format.toUpperCase()}`,
-      });
+      await handleExport(
+        () => Promise.resolve(blob),
+        {
+          filename: "dashboard-export",
+          format,
+          includeTimestamp: true,
+          metadata: {
+            websiteCount: websiteIds.length,
+            exportType: "dashboard_data",
+            dataTypes: ["metrics", "timeSeriesData", "topicPerformance"],
+          },
+        }
+      );
     } catch (error) {
-      toast({
-        title: "Export failed",
-        description: "Failed to export data. Please try again.",
-        variant: "destructive",
-      });
+      console.error("Export failed:", error);
     } finally {
       setIsExporting(false);
     }

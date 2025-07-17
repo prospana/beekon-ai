@@ -383,7 +383,7 @@ export class OptimizedCompetitorService extends BaseService {
   }
 
   /**
-   * Batch add competitors (optimized for multiple inserts)
+   * Batch add competitors (optimized for multiple inserts with UPSERT)
    */
   async batchAddCompetitors(
     websiteId: string,
@@ -395,41 +395,88 @@ export class OptimizedCompetitorService extends BaseService {
       const { data: existing } = await supabase
         .schema("beekon_data")
         .from("competitors")
-        .select("competitor_domain")
+        .select("id, competitor_domain, competitor_name, is_active")
         .eq("website_id", websiteId)
         .in("competitor_domain", domains);
 
-      const existingDomains = new Set(
-        existing?.map((e) => e.competitor_domain) || []
+      const existingMap = new Map(
+        existing?.map((e) => [e.competitor_domain, e]) || []
       );
+      
       const newCompetitors = competitors.filter(
-        (c) => !existingDomains.has(c.domain)
+        (c) => !existingMap.has(c.domain)
+      );
+      
+      const updatedCompetitors = competitors.filter(
+        (c) => existingMap.has(c.domain)
       );
 
-      if (newCompetitors.length === 0) {
-        return [];
+      const results: Competitor[] = [];
+
+      // Insert new competitors
+      if (newCompetitors.length > 0) {
+        const { data: newData, error: insertError } = await supabase
+          .schema("beekon_data")
+          .from("competitors")
+          .insert(
+            newCompetitors.map((comp) => ({
+              website_id: websiteId,
+              competitor_domain: comp.domain,
+              competitor_name: comp.name || null,
+              is_active: true,
+            }))
+          )
+          .select();
+
+        if (insertError) throw insertError;
+        results.push(...(newData || []));
       }
 
-      // Batch insert new competitors
-      const { data, error } = await supabase
-        .schema("beekon_data")
-        .from("competitors")
-        .insert(
-          newCompetitors.map((comp) => ({
-            website_id: websiteId,
-            competitor_domain: comp.domain,
-            competitor_name: comp.name || null,
-            is_active: true,
-          }))
-        )
-        .select();
+      // Update existing competitors (reactivate and update name if provided)
+      for (const comp of updatedCompetitors) {
+        const existing = existingMap.get(comp.domain);
+        if (existing) {
+          const updates: Partial<Competitor> = { is_active: true };
+          if (comp.name && comp.name !== existing.competitor_name) {
+            updates.competitor_name = comp.name;
+          }
 
-      if (error) throw error;
+          const { data: updateData, error: updateError } = await supabase
+            .schema("beekon_data")
+            .from("competitors")
+            .update(updates)
+            .eq("id", existing.id)
+            .select()
+            .single();
 
-      // Clear cache
+          if (updateError) throw updateError;
+          if (updateData) results.push(updateData);
+        }
+      }
+
+      // Clear all relevant cache for this website
       this.clearCache(`competitors_${websiteId}`);
+      this.clearCache(`performance_${websiteId}`);
+      this.clearCache(`analytics_${websiteId}`);
+      
+      // Clear cache patterns that might contain this website ID
+      for (const key of this.cache.keys()) {
+        if (key.includes(websiteId)) {
+          this.cache.delete(key);
+        }
+      }
 
-      return data || [];
+      // Refresh materialized views to ensure new competitors appear in analytics
+      try {
+        await this.refreshCompetitorViews();
+        await this.refreshCompetitorAnalysis();
+        console.log(`Materialized views refreshed after adding ${results.length} competitors`);
+      } catch (refreshError) {
+        console.warn("Failed to refresh materialized views after adding competitors:", refreshError);
+        // Don't throw the error to avoid breaking the main operation
+      }
+
+      return results;
     } catch (error) {
       console.error("Failed to batch add competitors:", error);
       throw error;
@@ -437,7 +484,7 @@ export class OptimizedCompetitorService extends BaseService {
   }
 
   /**
-   * Add a new competitor (optimized)
+   * Add a new competitor (optimized with UPSERT behavior)
    */
   async addCompetitor(
     websiteId: string,
@@ -448,7 +495,19 @@ export class OptimizedCompetitorService extends BaseService {
       { domain, name },
     ]);
     if (result.length === 0) {
-      throw new Error("Competitor already exists");
+      // If no result, try to get the existing competitor
+      const { data: existing } = await supabase
+        .schema("beekon_data")
+        .from("competitors")
+        .select("*")
+        .eq("website_id", websiteId)
+        .eq("competitor_domain", domain)
+        .single();
+      
+      if (existing) {
+        return existing;
+      }
+      throw new Error("Failed to add or retrieve competitor");
     }
     return result[0];
   }
@@ -473,6 +532,16 @@ export class OptimizedCompetitorService extends BaseService {
 
       // Clear relevant cache
       this.clearCache(`competitors_${data.website_id}`);
+
+      // Refresh materialized views to ensure updated competitors appear in analytics
+      try {
+        await this.refreshCompetitorViews();
+        await this.refreshCompetitorAnalysis();
+        console.log(`Materialized views refreshed after updating competitor ${competitorId}`);
+      } catch (refreshError) {
+        console.warn("Failed to refresh materialized views after updating competitor:", refreshError);
+        // Don't throw the error to avoid breaking the main operation
+      }
 
       return data;
     } catch (error) {
@@ -499,6 +568,16 @@ export class OptimizedCompetitorService extends BaseService {
       // Clear relevant cache
       if (data) {
         this.clearCache(`competitors_${data.website_id}`);
+        
+        // Refresh materialized views to ensure deleted competitors are removed from analytics
+        try {
+          await this.refreshCompetitorViews();
+          await this.refreshCompetitorAnalysis();
+          console.log(`Materialized views refreshed after deleting competitor ${competitorId}`);
+        } catch (refreshError) {
+          console.warn("Failed to refresh materialized views after deleting competitor:", refreshError);
+          // Don't throw the error to avoid breaking the main operation
+        }
       }
     } catch (error) {
       console.error("Failed to delete competitor:", error);

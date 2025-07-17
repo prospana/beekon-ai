@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, RefreshCw, Download, Filter } from 'lucide-react';
+import { Plus, RefreshCw, Download, Filter, Globe } from 'lucide-react';
 import { Website } from '@/hooks/useWorkspace';
 
 interface CompetitorsHeaderProps {
@@ -60,7 +60,7 @@ export default function CompetitorsHeader({
   handleAddCompetitor,
 }: CompetitorsHeaderProps) {
   return (
-    <div className="flex justify-between items-center">
+    <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
       <div>
         <h1 className="text-3xl font-bold">Competitors</h1>
         <p className="text-muted-foreground">
@@ -74,56 +74,120 @@ export default function CompetitorsHeader({
         </p>
       </div>
       
-      <div className="flex items-center space-x-2">
-        <div className="flex gap-1 mr-2">
-          {(['7d', '30d', '90d'] as const).map((period) => (
-            <Button
-              key={period}
-              variant={dateFilter === period ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setDateFilter(period)}
-              disabled={isRefreshing}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Website Selector - Primary control */}
+        <Select 
+          value={selectedWebsiteId} 
+          onValueChange={setSelectedWebsiteId}
+          disabled={websitesLoading || websites.length === 0 || isRefreshing}
+        >
+          <SelectTrigger className={`w-[200px] ${isRefreshing ? 'opacity-50' : ''}`}>
+            <Globe className="h-4 w-4 mr-2" />
+            <SelectValue 
+              placeholder={
+                websitesLoading 
+                  ? "Loading websites..." 
+                  : websites.length === 0 
+                    ? "No websites available" 
+                    : "Select website..."
+              }
             >
-              {period}
-            </Button>
-          ))}
-        </div>
-        
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue />
+              {selectedWebsiteId && websites.length > 0 && (
+                <span className="truncate">
+                  {websites.find(w => w.id === selectedWebsiteId)?.display_name || 
+                   websites.find(w => w.id === selectedWebsiteId)?.domain || 
+                   'Selected website'}
+                </span>
+              )}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="shareOfVoice">Share of Voice</SelectItem>
-            <SelectItem value="averageRank">Average Rank</SelectItem>
-            <SelectItem value="mentionCount">Mention Count</SelectItem>
-            <SelectItem value="sentimentScore">Sentiment Score</SelectItem>
+            {websites.length > 0 ? (
+              websites.map((website) => (
+                <SelectItem key={website.id} value={website.id}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {website.display_name || website.domain}
+                      </span>
+                      {website.display_name && (
+                        <span className="text-sm text-muted-foreground">
+                          {website.domain}
+                        </span>
+                      )}
+                    </div>
+                    <Badge 
+                      variant={website.is_active ? "default" : "secondary"}
+                      className="ml-2"
+                    >
+                      {website.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              ))
+            ) : (
+              <div className="p-2 text-sm text-muted-foreground">
+                No websites available. Please add a website first.
+              </div>
+            )}
           </SelectContent>
         </Select>
         
-        <LoadingButton
-          variant="outline"
-          size="sm"
-          loading={isRefreshing}
-          loadingText="Refreshing..."
-          onClick={refreshData}
-          icon={<RefreshCw className="h-4 w-4" />}
-        >
-          Refresh
-        </LoadingButton>
+        {/* Filters Group */}
+        <div className="flex items-center gap-1 border-l border-border pl-2">
+          <div className="flex gap-1">
+            {(['7d', '30d', '90d'] as const).map((period) => (
+              <Button
+                key={period}
+                variant={dateFilter === period ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setDateFilter(period)}
+                disabled={isRefreshing}
+              >
+                {period}
+              </Button>
+            ))}
+          </div>
+          
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shareOfVoice">Share of Voice</SelectItem>
+              <SelectItem value="averageRank">Average Rank</SelectItem>
+              <SelectItem value="mentionCount">Mention Count</SelectItem>
+              <SelectItem value="sentimentScore">Sentiment Score</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         
-        <LoadingButton
-          variant="outline"
-          size="sm"
-          loading={isExporting}
-          loadingText="Exporting..."
-          onClick={() => handleExportData('csv')}
-          icon={<Download className="h-4 w-4" />}
-          disabled={!hasData}
-        >
-          Export
-        </LoadingButton>
+        {/* Actions Group */}
+        <div className="flex items-center gap-2 border-l border-border pl-2">
+          <LoadingButton
+            variant="outline"
+            size="sm"
+            loading={isRefreshing}
+            loadingText="Refreshing..."
+            onClick={refreshData}
+            icon={<RefreshCw className="h-4 w-4" />}
+          >
+            Refresh
+          </LoadingButton>
+          
+          <LoadingButton
+            variant="outline"
+            size="sm"
+            loading={isExporting}
+            loadingText="Exporting..."
+            onClick={() => handleExportData('csv')}
+            icon={<Download className="h-4 w-4" />}
+            disabled={!hasData}
+          >
+            Export
+          </LoadingButton>
+        </div>
     
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>

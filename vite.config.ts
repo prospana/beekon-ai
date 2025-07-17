@@ -31,11 +31,22 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: isDevelopment ? 'inline' : false,
       minify: 'esbuild',
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 500, // Smaller chunks for better caching
+      target: 'es2015',
       rollupOptions: {
+        treeshake: {
+          moduleSideEffects: false,
+        },
         output: {
           manualChunks: {
-            vendor: ['react', 'react-dom'],
+            // Core React and routing
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+            
+            // Data fetching and state management
+            query: ['@tanstack/react-query'],
+            supabase: ['@supabase/supabase-js'],
+            
+            // UI components - split into smaller chunks
             radix: [
               '@radix-ui/react-accordion', 
               '@radix-ui/react-alert-dialog',
@@ -58,11 +69,33 @@ export default defineConfig(({ mode }) => {
               '@radix-ui/react-toggle',
               '@radix-ui/react-tooltip'
             ],
+            
+            // Utility libraries
             utils: ['clsx', 'tailwind-merge', 'class-variance-authority'],
+            
+            // Form handling
             forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-            supabase: ['@supabase/supabase-js'],
+            
+            // Icons - separate chunk as they can be large
             icons: ['lucide-react'],
+            
+            // Charts - separate chunk as they are feature-specific
             charts: ['recharts'],
+            
+            // Date and time utilities
+            date: ['date-fns'],
+            
+            // Markdown rendering
+            markdown: ['react-markdown', 'remark-gfm'],
+            
+            // Notifications
+            toast: ['sonner'],
+            
+            // Theming
+            theme: ['next-themes'],
+            
+            // Other UI components
+            ui: ['embla-carousel-react', 'vaul', 'input-otp', 'react-resizable-panels'],
           },
           // Split route chunks by functionality
           chunkFileNames: (chunkInfo) => {
