@@ -59,6 +59,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      competitor_analysis_results: {
+        Row: {
+          analyzed_at: string | null;
+          competitor_id: string;
+          confidence_score: number | null;
+          created_at: string | null;
+          id: string;
+          is_mentioned: boolean | null;
+          llm_provider: string;
+          prompt_id: string;
+          rank_position: number | null;
+          response_text: string | null;
+          sentiment_score: number | null;
+          summary_text: string | null;
+        };
+        Insert: {
+          analyzed_at?: string | null;
+          competitor_id: string;
+          confidence_score?: number | null;
+          created_at?: string | null;
+          id?: string;
+          is_mentioned?: boolean | null;
+          llm_provider: string;
+          prompt_id: string;
+          rank_position?: number | null;
+          response_text?: string | null;
+          sentiment_score?: number | null;
+          summary_text?: string | null;
+        };
+        Update: {
+          analyzed_at?: string | null;
+          competitor_id?: string;
+          confidence_score?: number | null;
+          created_at?: string | null;
+          id?: string;
+          is_mentioned?: boolean | null;
+          llm_provider?: string;
+          prompt_id?: string;
+          rank_position?: number | null;
+          response_text?: string | null;
+          sentiment_score?: number | null;
+          summary_text?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "competitor_analysis_results_competitor_id_fkey";
+            columns: ["competitor_id"];
+            isOneToOne: false;
+            referencedRelation: "competitors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "competitor_analysis_results_prompt_id_fkey";
+            columns: ["prompt_id"];
+            isOneToOne: false;
+            referencedRelation: "prompts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       competitors: {
         Row: {
           analysis_frequency: string | null;
@@ -535,6 +595,65 @@ export type Database = {
           }
         ];
       };
+      mv_competitor_share_of_voice: {
+        Row: {
+          avg_confidence_score: number | null;
+          avg_rank_position: number | null;
+          avg_sentiment_score: number | null;
+          competitor_domain: string | null;
+          competitor_id: string | null;
+          competitor_name: string | null;
+          last_analyzed_at: string | null;
+          share_of_voice: number | null;
+          total_analyses: number | null;
+          total_voice_mentions: number | null;
+          website_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "competitors_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      mv_competitive_gap_analysis: {
+        Row: {
+          competitor_avg_score: number | null;
+          competitor_count: number | null;
+          gap_type: string | null;
+          performance_gap: number | null;
+          topic_id: string | null;
+          topic_name: string | null;
+          website_id: string | null;
+          your_brand_score: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "topics_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "user_accessible_websites";
+            referencedColumns: ["website_id"];
+          },
+          {
+            foreignKeyName: "topics_website_id_fkey";
+            columns: ["website_id"];
+            isOneToOne: false;
+            referencedRelation: "websites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       user_accessible_websites: {
         Row: {
           user_id: string | null;
@@ -588,6 +707,53 @@ export type Database = {
           mention_trend_7d: number;
           recent_sentiment_score: number;
           recent_avg_rank: number;
+        }[];
+      };
+      get_competitor_share_of_voice: {
+        Args: {
+          p_website_id: string;
+          p_date_start?: string;
+          p_date_end?: string;
+        };
+        Returns: {
+          competitor_id: string;
+          competitor_name: string;
+          competitor_domain: string;
+          total_analyses: number;
+          total_voice_mentions: number;
+          share_of_voice: number;
+          avg_rank_position: number;
+          avg_sentiment_score: number;
+          avg_confidence_score: number;
+        }[];
+      };
+      get_competitive_gap_analysis: {
+        Args: {
+          p_website_id: string;
+          p_date_start?: string;
+          p_date_end?: string;
+        };
+        Returns: {
+          topic_id: string;
+          topic_name: string;
+          your_brand_score: number;
+          competitor_data: unknown;
+        }[];
+      };
+      analyze_competitor_mentions: {
+        Args: {
+          p_website_id: string;
+          p_competitor_id: string;
+          p_prompt_id: string;
+          p_llm_provider: string;
+          p_response_text: string;
+        };
+        Returns: {
+          is_mentioned: boolean;
+          rank_position: number;
+          sentiment_score: number;
+          confidence_score: number;
+          summary_text: string;
         }[];
       };
       get_competitor_query_stats: {
@@ -659,6 +825,10 @@ export type Database = {
         }[];
       };
       refresh_competitor_performance_views: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      refresh_competitor_analysis_views: {
         Args: Record<PropertyKey, never>;
         Returns: undefined;
       };

@@ -199,7 +199,7 @@ BEGIN
                 ORDER BY competitor_score DESC
             ) AS competitor_data
         FROM competitor_performance
-        GROUP BY topic_id
+        GROUP BY competitor_performance.topic_id
     )
     SELECT 
         ybp.topic_id,
@@ -360,7 +360,7 @@ WITH topic_performance AS (
             AND car.analyzed_at >= NOW() - INTERVAL '30 days'
             GROUP BY p2.topic_id, c.id
         ) competitor_scores
-        GROUP BY topic_id
+        GROUP BY competitor_scores.topic_id
     ) comp_stats ON t.id = comp_stats.topic_id
     WHERE t.is_active = TRUE
     AND lar.analyzed_at >= NOW() - INTERVAL '30 days'
