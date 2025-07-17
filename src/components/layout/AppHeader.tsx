@@ -23,21 +23,21 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="h-16 border-b bg-background flex items-center justify-between px-4 sm:px-6">
+      <header className="h-16 border-b bg-background flex items-center justify-between px-5 sm:px-6">
         <div className="flex items-center">
           <SidebarTrigger className="mr-4" />
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
           <WorkspaceDropdown />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                <Avatar className="h-10 w-10">
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
+                <Avatar className="h-9 w-9">
                   {profile?.avatar_url ? (
                     <AvatarImage src={profile.avatar_url} alt="Profile" />
                   ) : null}
-                  <AvatarFallback className="bg-primary text-primary-foreground">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>

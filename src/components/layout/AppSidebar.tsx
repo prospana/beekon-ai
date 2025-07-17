@@ -24,9 +24,13 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-6">
-        <div className="flex items-center space-x-2 max-h-5">
-          <img src="/beekon-transparent-cropped.png" alt="" />
+      <SidebarHeader className="p-5">
+        <div className="flex items-center space-x-2 max-h-6">
+          <img
+            src="/beekon-transparent-cropped.png"
+            alt="Beekon"
+            className="h-6 w-auto"
+          />
         </div>
       </SidebarHeader>
 
@@ -40,14 +44,14 @@ export function AppSidebar() {
                     <NavLink
                       to={item.href}
                       className={({ isActive }) =>
-                        `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        `flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                           isActive
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            ? "bg-primary text-primary shadow-sm"
+                            : "text-sidebar hover:bg-accent hover:text-accent-foreground hover:scale-[0.98]"
                         }`
                       }
                     >
-                      <item.icon className="h-5 w-5 flex-shrink-0" />
+                      <item.icon className="h-4 w-4 flex-shrink-0" />
                       <span className="ml-3">{item.name}</span>
                     </NavLink>
                   </SidebarMenuButton>

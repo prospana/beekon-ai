@@ -1,76 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Beekon.ai Brand Colors */
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 20% 98%;
-    --primary-light: 262 83% 68%;
-    --primary-dark: 262 83% 48%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Clean Design System Colors - #0f172a, #f8fafc, black, white */
+    --primary: 222 84% 11%;          /* #0f172a - dark slate */
+    --primary-foreground: 210 40% 98%; /* #f8fafc - light slate */
+    --primary-light: 222 84% 21%;     /* lighter version of #0f172a */
+    --primary-dark: 0 0% 0%;          /* black */
+    --secondary: 210 40% 98%;         /* #f8fafc - light slate */
+    --secondary-foreground: 222 84% 11%;
     
-    /* UI Colors */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    /* UI Colors - Clean monochrome palette */
+    --background: 210 40% 98%;        /* #f8fafc - light background */
+    --foreground: 222 84% 11%;        /* #0f172a - dark text */
+    --card: 0 0% 100%;                /* white cards */
+    --card-foreground: 222 84% 11%;   /* dark text on cards */
+    --popover: 0 0% 100%;             /* white popover */
+    --popover-foreground: 222 84% 11%; 
+    --muted: 220 14% 96%;             /* very light gray */
+    --muted-foreground: 220 9% 46%;   /* medium gray */
+    --accent: 220 14% 96%;            /* light accent */
+    --accent-foreground: 222 84% 11%; /* dark accent text */
+    --destructive: 0 84% 60%;         /* red for errors */
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 262 83% 58%;
+    --border: 220 13% 91%;            /* light borders */
+    --input: 220 13% 91%;             /* input borders */
+    --ring: 222 84% 11%;              /* focus rings */
     --radius: 0.5rem;
     
-    /* Success & Warning */
-    --success: 142 76% 36%;
-    --success-foreground: 355 7% 97%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 48 96% 89%;
+    /* Success & Warning - Subtle, clean colors */
+    --success: 142 71% 45%;           /* green */
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;            /* orange */
+    --warning-foreground: 0 0% 98%;
     
-    /* Chart Colors */
-    --chart-1: 262 83% 58%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    /* Chart Colors - Monochrome with subtle variations */
+    --chart-1: 222 84% 11%;           /* primary dark */
+    --chart-2: 220 9% 46%;            /* medium gray */
+    --chart-3: 220 9% 26%;            /* darker gray */
+    --chart-4: 220 13% 69%;           /* light gray */
+    --chart-5: 0 0% 0%;               /* black */
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    /* Dark mode - pure black background with white text */
+    --background: 0 0% 0%;            /* pure black */
+    --foreground: 0 0% 98%;           /* near white */
+    --card: 0 0% 4%;                  /* very dark gray cards */
+    --card-foreground: 0 0% 98%;      /* white text on cards */
+    --popover: 0 0% 4%;               /* dark popover */
     --popover-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --muted: 0 0% 8%;                 /* dark muted */
+    --muted-foreground: 0 0% 65%;     /* light gray text */
+    --accent: 0 0% 8%;                /* dark accent */
+    --accent-foreground: 0 0% 98%;    /* white accent text */
+    --destructive: 0 84% 60%;         /* red for errors */
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 262 83% 58%;
+    --border: 0 0% 15%;               /* dark borders */
+    --input: 0 0% 15%;                /* dark input borders */
+    --ring: 0 0% 98%;                 /* white focus rings */
     
-    --success: 142 76% 36%;
-    --success-foreground: 355 7% 97%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 48 96% 89%;
+    --success: 142 71% 45%;           /* green */
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;            /* orange */
+    --warning-foreground: 0 0% 98%;
     
-    --chart-1: 262 83% 68%;
-    --chart-2: 173 58% 49%;
-    --chart-3: 197 37% 34%;
-    --chart-4: 43 74% 76%;
-    --chart-5: 27 87% 77%;
+    /* Chart Colors - Dark mode variations */
+    --chart-1: 0 0% 98%;              /* white */
+    --chart-2: 0 0% 65%;              /* light gray */
+    --chart-3: 0 0% 45%;              /* medium gray */
+    --chart-4: 0 0% 25%;              /* dark gray */
+    --chart-5: 222 84% 21%;           /* accent dark */
   }
 }
 
@@ -79,31 +83,69 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Enhanced typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+  
+  h1 {
+    @apply text-3xl lg:text-4xl;
+    line-height: 1.1;
+  }
+  
+  h2 {
+    @apply text-2xl lg:text-3xl;
+    line-height: 1.2;
+  }
+  
+  h3 {
+    @apply text-xl lg:text-2xl;
+    line-height: 1.25;
+  }
+  
+  h4 {
+    @apply text-lg lg:text-xl;
+    line-height: 1.3;
+  }
+  
+  p {
+    @apply leading-relaxed;
+  }
+  
+  /* Better text balance for headings */
+  h1, h2, h3 {
+    text-wrap: balance;
   }
 }
 
-/* Missing sidebar definitions to complete the design system */
+/* Sidebar definitions for clean design system */
 @layer base {
   :root {
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 0 0% 100%;        /* white sidebar */
+    --sidebar-foreground: 222 84% 11%;      /* dark text */
+    --sidebar-primary: 222 84% 11%;         /* primary color */
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 220 14% 96%;          /* light accent */
+    --sidebar-accent-foreground: 222 84% 11%;
+    --sidebar-border: 220 13% 91%;          /* light border */
+    --sidebar-ring: 222 84% 11%;            /* focus ring */
   }
 
   .dark {
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 0 0% 0%;          /* black sidebar */
+    --sidebar-foreground: 0 0% 98%;         /* white text */
+    --sidebar-primary: 0 0% 98%;            /* white primary */
+    --sidebar-primary-foreground: 0 0% 0%;  /* black text */
+    --sidebar-accent: 0 0% 8%;              /* dark accent */
+    --sidebar-accent-foreground: 0 0% 98%;  /* white text */
+    --sidebar-border: 0 0% 15%;             /* dark border */
+    --sidebar-ring: 0 0% 98%;               /* white focus ring */
   }
 }
