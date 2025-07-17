@@ -9,12 +9,14 @@ interface CompetitorsListProps {
   performance: CompetitorPerformance[];
   sortBy: 'shareOfVoice' | 'averageRank' | 'mentionCount' | 'sentimentScore';
   confirmDelete: (competitorId: string) => void;
+  isDeleting?: boolean;
 }
 
 export default function CompetitorsList({
   performance,
   sortBy,
   confirmDelete,
+  isDeleting = false,
 }: CompetitorsListProps) {
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
@@ -106,7 +108,7 @@ export default function CompetitorsList({
                   
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" disabled={isDeleting}>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -114,9 +116,10 @@ export default function CompetitorsList({
                       <DropdownMenuItem 
                         className="text-destructive"
                         onClick={() => confirmDelete(competitor.competitorId)}
+                        disabled={isDeleting}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
-                        Remove
+                        {isDeleting ? "Removing..." : "Remove"}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

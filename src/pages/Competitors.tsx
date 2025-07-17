@@ -1,7 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
-import { useCompetitors } from "@/hooks/useCompetitors";
+import {
+  useCompetitorData,
+  useAddCompetitor,
+  useDeleteCompetitor,
+} from "@/hooks/useCompetitorsQuery";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import CompetitorsHeader from "@/components/competitors/CompetitorsHeader";
 import CompetitorsLoadingState from "@/components/competitors/CompetitorsLoadingState";
@@ -30,7 +34,7 @@ export default function Competitors() {
   const [competitorDomain, setCompetitorDomain] = useState("");
   const [competitorName, setCompetitorName] = useState("");
   const [selectedWebsiteId, setSelectedWebsiteId] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
+  const [isWebhookProcessing, setIsWebhookProcessing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [competitorToDelete, setCompetitorToDelete] = useState<string | null>(
     null
@@ -63,23 +67,34 @@ export default function Competitors() {
     };
   }, [dateFilter]);
 
-  // Use competitors hook with filters
+  // Use competitors React Query hooks
   const {
+    competitors,
     performance,
     analytics,
     isLoading,
     isRefreshing,
     error,
-    deleteCompetitor,
-    exportCompetitorData,
-    refreshData,
-    clearError,
+    refetch,
+    targetWebsiteId,
     hasData,
-  } = useCompetitors(selectedWebsiteId, {
+  } = useCompetitorData(selectedWebsiteId, {
     dateRange,
     sortBy,
     sortOrder: "desc",
   });
+
+  // Mutations for competitor operations
+  const addCompetitorMutation = useAddCompetitor();
+  const deleteCompetitorMutation = useDeleteCompetitor();
+
+  // Compatibility functions for existing code
+  const refreshData = refetch || (() => {});
+  const clearError = () => {}; // Errors clear automatically in React Query
+  const exportCompetitorData = async (format: "pdf" | "csv" | "json") => {
+    // TODO: Implement export functionality
+    console.log("Export functionality to be implemented", format);
+  };
 
   // Prepare chart data from analytics (memoized to prevent unnecessary recalculations)
   const shareOfVoiceData = useMemo(() => {
@@ -164,7 +179,6 @@ export default function Competitors() {
         variant: "default",
       });
     }
-    setIsAdding(true);
 
     // Validate domain format
     const domainRegex =
@@ -176,48 +190,71 @@ export default function Competitors() {
         description: "Please enter a valid domain name",
         variant: "destructive",
       });
-      setIsAdding(false);
       return;
     }
 
-    const response = await sendN8nWebhook("webhook/competitors-onboarding", {
-      website_id: selectedWebsite.id,
-      website_name: selectedWebsite.display_name,
-      website_url: selectedWebsite.domain,
-      competitors_url: addProtocol(competitorDomain),
-      display_name: competitorName,
-      workspace_id: currentWorkspace?.id,
-    });
+    try {
+      // Step 1: Add competitor to database using React Query mutation
+      const { id } = await addCompetitorMutation.mutateAsync({
+        websiteId: selectedWebsiteId,
+        domain: addProtocol(competitorDomain),
+        name: competitorName || undefined,
+      });
 
-    if (!response.success) {
+      // Step 2: Send webhook to N8N for analysis processing
+      setIsWebhookProcessing(true);
+      const response = await sendN8nWebhook("webhook/competitors-onboarding", {
+        website_id: selectedWebsite.id,
+        website_name: selectedWebsite.display_name,
+        website_url: selectedWebsite.domain,
+        competitors_url: addProtocol(competitorDomain),
+        display_name: competitorName,
+        workspace_id: currentWorkspace?.id,
+        competitor_id: id,
+      });
+
+      if (!response.success) {
+        toast({
+          title: "Warning",
+          description:
+            "Competitor added but analysis failed to start. Analysis can be retried later.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Analysis started!",
+          description: `Competitor analysis is now processing for ${
+            competitorName || competitorDomain
+          }.`,
+        });
+      }
+
+      setCompetitorName("");
+      setCompetitorDomain("");
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to add competitor:", error);
       toast({
         title: "Error",
-        description: "Failed to crawl competitor's website.",
+        description:
+          error instanceof Error ? error.message : "Failed to add competitor",
         variant: "destructive",
       });
-      setIsAdding(false);
-      return;
+    } finally {
+      setIsWebhookProcessing(false);
     }
-
-    // Here you would typically make an API call to add the website
-    toast({
-      title: "Competitor's Website added!",
-      description: `Competitors Analysis started for ${competitorDomain}`,
-    });
-
-    setIsAdding(false);
-    setCompetitorName("");
-    setCompetitorDomain("");
-    setIsAddDialogOpen(false);
   };
 
   const handleDeleteCompetitor = async (competitorId: string) => {
     try {
-      await deleteCompetitor(competitorId);
+      await deleteCompetitorMutation.mutateAsync({
+        competitorId,
+        websiteId: selectedWebsiteId,
+      });
       setShowDeleteConfirm(false);
       setCompetitorToDelete(null);
     } catch (error) {
-      // Error is already handled by the hook
+      // Error is already handled by the mutation hook
     }
   };
 
@@ -282,7 +319,7 @@ export default function Competitors() {
           competitorDomain={competitorDomain}
           competitorName={competitorName}
           selectedWebsiteId={selectedWebsiteId}
-          isAdding={isAdding}
+          isAdding={addCompetitorMutation.isPending || isWebhookProcessing}
           websites={websites || []}
           websitesLoading={workspaceLoading}
           setDateFilter={setDateFilter}
@@ -319,6 +356,7 @@ export default function Competitors() {
           performance={performance}
           sortBy={sortBy}
           confirmDelete={confirmDelete}
+          isDeleting={deleteCompetitorMutation.isPending}
         />
 
         {/* Competitive Gap Analysis */}

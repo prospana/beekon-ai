@@ -1,4 +1,5 @@
 import { ApiKeyModal } from "@/components/ApiKeyModal";
+import { ExportHistoryModal } from "@/components/ExportHistoryModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useExportHistory } from "@/hooks/useExportHistory";
 import { ApiKey, apiKeyService } from "@/services/apiKeyService";
 import { profileService, UserProfile } from "@/services/profileService";
 import {
@@ -31,6 +33,8 @@ import {
   Settings as SettingsIcon,
   Shield,
   User,
+  FileOutput,
+  History,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -38,6 +42,7 @@ export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { profile, isLoading: isLoadingProfile, loadProfile, updateProfile, uploadAvatar, deleteAvatar, getInitials } = useProfile();
+  const { exportSummary, recentActivity } = useExportHistory();
   const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [isPasswordUpdating, setIsPasswordUpdating] = useState(false);
   const [isApiModalOpen, setIsApiModalOpen] = useState(false);
@@ -738,6 +743,100 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">
                   Use API keys to integrate Beekon.ai with your applications.
                   Keep them secure and don't share them publicly.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Export History */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <FileOutput className="h-5 w-5" />
+                  <CardTitle>Export History</CardTitle>
+                </div>
+                <CardDescription>
+                  View and manage your data export history
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {exportSummary && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-blue-900">Total Exports</p>
+                          <p className="text-2xl font-bold text-blue-900">{exportSummary.total_exports}</p>
+                        </div>
+                        <FileOutput className="w-8 h-8 text-blue-500" />
+                      </div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-900">Success Rate</p>
+                          <p className="text-2xl font-bold text-green-900">
+                            {exportSummary.total_exports > 0 
+                              ? Math.round((exportSummary.successful_exports / exportSummary.total_exports) * 100)
+                              : 0}%
+                          </p>
+                        </div>
+                        <History className="w-8 h-8 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-purple-900">Favorite Format</p>
+                          <p className="text-2xl font-bold text-purple-900 uppercase">
+                            {exportSummary.favorite_format}
+                          </p>
+                        </div>
+                        <FileOutput className="w-8 h-8 text-purple-500" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {recentActivity && recentActivity.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium">Recent Activity</Label>
+                    <div className="mt-2 space-y-2">
+                      {recentActivity.slice(0, 3).map((activity) => (
+                        <div key={activity.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex items-center space-x-2">
+                            <FileOutput className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium">{activity.filename}</span>
+                            <span className={`px-2 py-1 text-xs rounded ${
+                              activity.status === 'completed' 
+                                ? 'bg-green-100 text-green-800' 
+                                : activity.status === 'failed'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {activity.status}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {new Date(activity.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-3">
+                  <ExportHistoryModal>
+                    <Button variant="outline">
+                      <History className="h-4 w-4 mr-2" />
+                      View Full History
+                    </Button>
+                  </ExportHistoryModal>
+                </div>
+                
+                <p className="text-sm text-muted-foreground">
+                  Track and manage all your data exports including analysis results, 
+                  dashboard reports, and website data exports.
                 </p>
               </CardContent>
             </Card>

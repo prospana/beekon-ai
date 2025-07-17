@@ -60,6 +60,12 @@ export type WorkspaceInsert =
 export type WorkspaceUpdate =
   Database["beekon_data"]["Tables"]["workspaces"]["Update"];
 
+export type ExportHistory = Database["beekon_data"]["Tables"]["export_history"]["Row"];
+export type ExportHistoryInsert =
+  Database["beekon_data"]["Tables"]["export_history"]["Insert"];
+export type ExportHistoryUpdate =
+  Database["beekon_data"]["Tables"]["export_history"]["Update"];
+
 // Common notification settings type
 export interface NotificationSettings {
   email_notifications: boolean;
@@ -195,6 +201,55 @@ export interface DashboardMetrics {
   rank_trend: number;
   confidence_trend: number;
   sentiment_trend: number;
+}
+
+// Export history types
+export type ExportStatus = "pending" | "processing" | "completed" | "failed";
+export type ExportType = "analysis" | "dashboard" | "website" | "competitor" | "configuration" | "filtered_data";
+export type ExportFormat = "pdf" | "csv" | "json" | "excel" | "word";
+
+export interface ExportHistoryRecord {
+  id: string;
+  user_id: string;
+  export_type: ExportType;
+  format: ExportFormat;
+  filename: string;
+  file_size: number | null;
+  status: ExportStatus;
+  filters: Record<string, unknown> | null;
+  date_range: { start: string; end: string } | null;
+  metadata: Record<string, unknown> | null;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface ExportStatistics {
+  user_id: string;
+  export_type: ExportType;
+  format: ExportFormat;
+  status: ExportStatus;
+  total_exports: number;
+  total_size: number | null;
+  avg_size: number | null;
+  last_export: string | null;
+  successful_exports: number;
+  failed_exports: number;
+  avg_duration_seconds: number | null;
+}
+
+export interface UserExportSummary {
+  total_exports: number;
+  successful_exports: number;
+  failed_exports: number;
+  total_size: number;
+  avg_size: number;
+  last_export: string | null;
+  favorite_format: ExportFormat;
+  most_exported_type: ExportType;
+  export_frequency: number; // exports per day
 }
 
 // Type guards

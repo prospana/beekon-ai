@@ -539,7 +539,7 @@ export class AnalysisService {
 
   async exportAnalysisResults(
     analysisIds: string[],
-    format: "pdf" | "csv" | "json"
+    format: "pdf" | "csv" | "json" | "excel" | "word"
   ): Promise<Blob> {
     try {
       // Fetch all analysis results for the given IDs
@@ -570,17 +570,24 @@ export class AnalysisService {
       // Transform data using the shared transformation function
       const results = this.transformAnalysisData(data);
 
-      // Generate export based on format
-      switch (format) {
-        case "json":
-          return this.generateJsonExport(results);
-        case "csv":
-          return this.generateCsvExport(results);
-        case "pdf":
-          return this.generatePdfExport(results);
-        default:
-          throw new Error(`Unsupported export format: ${format}`);
-      }
+      // Use enhanced export service for all formats
+      const { exportService } = await import("./exportService");
+      const exportData = {
+        title: "Analysis Results Export",
+        data: results,
+        exportedAt: new Date().toISOString(),
+        totalRecords: results.length,
+        metadata: {
+          exportType: "analysis_results",
+          generatedBy: "Beekon AI Analysis Service",
+          analysisIds: analysisIds,
+        },
+      };
+      
+      return await exportService.exportData(exportData, format, { 
+        exportType: "analysis", 
+        customFilename: `analysis_results_${results.length}_items` 
+      });
     } catch (error) {
       console.error("Failed to export analysis results:", error);
       throw error;

@@ -4,6 +4,7 @@ import {
   type AnalysisResult,
   type LLMResult,
 } from "./analysisService";
+import { generateExportFilename } from "@/lib/export-utils";
 
 export interface DashboardMetrics {
   overallVisibilityScore: number;
@@ -588,7 +589,13 @@ export class DashboardService {
 
       // Use enhanced export service for all formats
       const { exportService } = await import("./exportService");
-      return await exportService.exportData(exportData, format);
+      return await exportService.exportData(exportData, format, { 
+        exportType: "dashboard", 
+        customFilename: generateExportFilename("dashboard_analytics", format, { 
+          includeTimestamp: true, 
+          dateRange: exportData.metadata.dateRange 
+        }) 
+      });
     } catch (error) {
       console.error("Failed to export dashboard data:", error);
       throw error;

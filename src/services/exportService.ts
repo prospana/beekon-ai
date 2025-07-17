@@ -10,6 +10,8 @@ import {
   formatPdfExport,
   generateExportFilename,
 } from "@/lib/export-utils";
+import { exportHistoryService } from "./exportHistoryService";
+import { ExportType, ExportHistoryRecord } from "@/types/database";
 
 // Export service class with enhanced functionality
 export class ExportService {
@@ -101,7 +103,7 @@ export class ExportService {
   }
 
   // Format array data for Excel
-  private formatArrayToExcel(data: any[]): string {
+  private formatArrayToExcel(data: Record<string, unknown>[]): string {
     if (data.length === 0) return "No data available\n";
     
     // Get headers from the first object
@@ -136,7 +138,7 @@ export class ExportService {
   }
 
   // Format object data for Excel
-  private formatObjectToExcel(data: Record<string, any>): string {
+  private formatObjectToExcel(data: Record<string, unknown>): string {
     let excelContent = "Property,Value\n";
     
     Object.entries(data).forEach(([key, value]) => {
@@ -164,7 +166,7 @@ export class ExportService {
   }
 
   // Format array data for Word
-  private formatArrayToWord(data: any[]): string {
+  private formatArrayToWord(data: Record<string, unknown>[]): string {
     if (data.length === 0) return "No data available\n";
     
     let wordContent = "Data Records\n";
@@ -196,7 +198,7 @@ export class ExportService {
   }
 
   // Format object data for Word
-  private formatObjectToWord(data: Record<string, any>): string {
+  private formatObjectToWord(data: Record<string, unknown>): string {
     let wordContent = "Data Summary\n";
     wordContent += "-".repeat(20) + "\n\n";
     
@@ -218,24 +220,101 @@ export class ExportService {
     return wordContent;
   }
 
-  // Main export function with support for all formats
+  // Main export function with support for all formats and history tracking
   async exportData(
     data: ExportData,
-    format: ExportFormat
+    format: ExportFormat,
+    options: {
+      trackHistory?: boolean;
+      exportType?: ExportType;
+      customFilename?: string;
+    } = {}
   ): Promise<Blob> {
-    switch (format) {
-      case "json":
-        return formatJsonExport(data);
-      case "csv":
-        return formatCsvExport(data);
-      case "pdf":
-        return formatPdfExport(data);
-      case "excel":
-        return this.generateExcelExport(data);
-      case "word":
-        return this.generateWordExport(data);
-      default:
-        throw new Error(`Unsupported export format: ${format}`);
+    const { trackHistory = true, exportType = "filtered_data", customFilename } = options;
+    
+    let exportRecord: ExportHistoryRecord | null = null;
+    
+    try {
+      // Create export history record if tracking is enabled
+      if (trackHistory) {
+        const filename = customFilename || generateExportFilename(
+          data.title.toLowerCase().replace(/\s+/g, '_'),
+          format,
+          { 
+            includeTimestamp: true, 
+            dateRange: data.dateRange 
+          }
+        );
+        
+        exportRecord = await exportHistoryService.createExportRecord({
+          export_type: exportType,
+          format,
+          filename,
+          filters: data.filters,
+          date_range: data.dateRange,
+          metadata: {
+            ...data.metadata,
+            total_records: data.totalRecords,
+            export_title: data.title,
+          },
+        });
+        
+        // Mark as processing
+        await exportHistoryService.startExportProcessing(exportRecord.id, {
+          processing_started: new Date().toISOString(),
+        });
+      }
+      
+      // Generate the export
+      let blob: Blob;
+      switch (format) {
+        case "json":
+          blob = formatJsonExport(data);
+          break;
+        case "csv":
+          blob = formatCsvExport(data);
+          break;
+        case "pdf":
+          blob = formatPdfExport(data);
+          break;
+        case "excel":
+          blob = this.generateExcelExport(data);
+          break;
+        case "word":
+          blob = this.generateWordExport(data);
+          break;
+        default:
+          throw new Error(`Unsupported export format: ${format}`);
+      }
+      
+      // Mark as completed if tracking is enabled
+      if (trackHistory && exportRecord) {
+        await exportHistoryService.completeExport(
+          exportRecord.id,
+          blob.size,
+          {
+            processing_completed: new Date().toISOString(),
+            actual_size: blob.size,
+            content_type: blob.type,
+          }
+        );
+      }
+      
+      return blob;
+    } catch (error) {
+      // Mark as failed if tracking is enabled
+      if (trackHistory && exportRecord) {
+        await exportHistoryService.failExport(
+          exportRecord.id,
+          error instanceof Error ? error.message : "Unknown error",
+          {
+            error_details: error instanceof Error ? error.stack : undefined,
+            failed_at: new Date().toISOString(),
+          }
+        );
+      }
+      
+      throw error;
     }
   }
 
@@ -252,7 +331,7 @@ export class ExportService {
     const { includeMetrics = true, includeAnalysisHistory = false, dateRange } = options;
 
     // Fetch website data
-    let query = supabase
+    const { data: websites, error } = await supabase
       .schema("beekon_data")
       .from("websites")
       .select(`
@@ -268,10 +347,9 @@ export class ExportService {
       `)
       .in("id", websiteIds);
 
-    const { data: websites, error } = await query;
     if (error) throw error;
 
-    let exportData: any[] = websites || [];
+    let exportData: Record<string, unknown>[] = websites || [];
 
     // Add metrics if requested
     if (includeMetrics) {
@@ -386,12 +464,18 @@ export class ExportService {
       },
     };
 
-    return this.exportData(exportContent, format);
+    return this.exportData(exportContent, format, { 
+      exportType: "website", 
+      customFilename: generateExportFilename("website_data", format, { 
+        includeTimestamp: true, 
+        dateRange 
+      }) 
+    });
   }
 
   // Export configuration data (for modals)
   async exportConfigurationData(
-    configData: any,
+    configData: Record<string, unknown>,
     configType: "analysis" | "website_settings" | "workspace",
     format: ExportFormat
   ): Promise<Blob> {
@@ -407,13 +491,18 @@ export class ExportService {
       },
     };
 
-    return this.exportData(exportContent, format);
+    return this.exportData(exportContent, format, { 
+      exportType: "configuration", 
+      customFilename: generateExportFilename(`${configType}_config`, format, { 
+        includeTimestamp: true 
+      }) 
+    });
   }
 
   // Export filtered data with advanced options
   async exportFilteredData(
     tableName: string,
-    filters: Record<string, any>,
+    filters: Record<string, unknown>,
     format: ExportFormat,
     options: {
       selectFields?: string;
@@ -478,7 +567,13 @@ export class ExportService {
       },
     };
 
-    return this.exportData(exportContent, format);
+    return this.exportData(exportContent, format, { 
+      exportType: "filtered_data", 
+      customFilename: generateExportFilename(tableName, format, { 
+        includeTimestamp: true, 
+        dateRange 
+      }) 
+    });
   }
 }
 
