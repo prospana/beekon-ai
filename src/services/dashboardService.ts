@@ -72,11 +72,11 @@ export class DashboardService {
     }
 
     try {
-      // Get all analysis results for the websites
-      const allResults = await this.getAllAnalysisResults(
-        websiteIds,
-        dateRange
-      );
+      // Execute all data fetching in parallel for better performance
+      const [allResults, previousPeriodMetrics] = await Promise.all([
+        this.getAllAnalysisResults(websiteIds, dateRange),
+        this.getPreviousPeriodMetrics(websiteIds, dateRange)
+      ]);
 
       if (allResults.length === 0) {
         return this.getEmptyMetrics();
@@ -85,11 +85,7 @@ export class DashboardService {
       // Calculate aggregated metrics
       const metrics = this.calculateAggregatedMetrics(allResults);
 
-      // Get trend data for comparison
-      const previousPeriodMetrics = await this.getPreviousPeriodMetrics(
-        websiteIds,
-        dateRange
-      );
+      // Calculate trend from parallel fetched data
       metrics.improvementTrend = this.calculateTrend(
         metrics.overallVisibilityScore,
         previousPeriodMetrics.overallVisibilityScore
@@ -176,31 +172,32 @@ export class DashboardService {
     if (websiteIds.length === 0) return [];
 
     try {
-      const websitePerformance: WebsitePerformance[] = [];
+      // Execute all website data fetching in parallel
+      const websitePromises = websiteIds.map(async (websiteId) => {
+        const [results, websiteInfo] = await Promise.all([
+          analysisService.getAnalysisResults(websiteId),
+          supabase
+            .schema("beekon_data")
+            .from("websites")
+            .select("domain, display_name")
+            .eq("id", websiteId)
+            .single()
+        ]);
 
-      for (const websiteId of websiteIds) {
-        const results = await analysisService.getAnalysisResults(websiteId);
         const metrics = this.calculateMetricsForResults(results);
 
-        // Get website info
-        const { data: website } = await supabase
-          .schema("beekon_data")
-          .from("websites")
-          .select("domain, display_name")
-          .eq("id", websiteId)
-          .single();
-
-        websitePerformance.push({
+        return {
           websiteId,
-          domain: website?.domain || "",
-          displayName: website?.display_name || "",
+          domain: websiteInfo.data?.domain || "",
+          displayName: websiteInfo.data?.display_name || "",
           visibility: metrics.overallVisibilityScore,
           mentions: metrics.totalMentions,
           sentiment: metrics.sentimentScore,
           lastAnalyzed: results.length > 0 ? results[0]!.analyzed_at : "",
-        });
-      }
+        };
+      });
 
+      const websitePerformance = await Promise.all(websitePromises);
       return websitePerformance.sort((a, b) => b.visibility - a.visibility);
     } catch (error) {
       console.error("Failed to get website performance:", error);
@@ -212,16 +209,24 @@ export class DashboardService {
     websiteIds: string[],
     dateRange?: { start: string; end: string }
   ): Promise<AnalysisResult[]> {
-    const allResults: AnalysisResult[] = [];
-
-    for (const websiteId of websiteIds) {
-      const results = await analysisService.getAnalysisResults(websiteId, {
-        dateRange,
-      });
-      allResults.push(...results);
+    if (websiteIds.length === 0) {
+      return [];
     }
 
-    return allResults;
+    try {
+      // Execute all website analysis fetching in parallel
+      const allResultsPromises = websiteIds.map(websiteId => 
+        analysisService.getAnalysisResults(websiteId, { dateRange })
+      );
+
+      const allResultsArrays = await Promise.all(allResultsPromises);
+      
+      // Flatten all results into a single array
+      return allResultsArrays.flat();
+    } catch (error) {
+      console.error("Failed to get analysis results:", error);
+      return [];
+    }
   }
 
   private calculateAggregatedMetrics(

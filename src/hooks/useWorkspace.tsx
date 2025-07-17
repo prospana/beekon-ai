@@ -114,11 +114,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       }));
 
       setWorkspaces((prev) => {
-        // Only update if the data actually changed to prevent unnecessary re-renders
-        if (JSON.stringify(prev) !== JSON.stringify(workspaceData)) {
+        // Use a more efficient comparison - check length and IDs first
+        if (prev.length !== workspaceData.length) {
           return workspaceData;
         }
-        return prev;
+        
+        // Compare IDs and updated_at timestamps for efficient change detection
+        const hasChanges = prev.some((prevWorkspace, index) => {
+          const newWorkspace = workspaceData[index];
+          return !newWorkspace || 
+                 prevWorkspace.id !== newWorkspace.id ||
+                 prevWorkspace.updated_at !== newWorkspace.updated_at;
+        });
+
+        return hasChanges ? workspaceData : prev;
       });
 
       // Set current workspace to the first one if none is selected and workspaces exist
@@ -363,11 +372,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       }));
 
       setWebsites((prev) => {
-        // Only update if the data actually changed to prevent unnecessary re-renders
-        if (JSON.stringify(prev) !== JSON.stringify(websiteData)) {
+        // Use a more efficient comparison - check length and IDs first
+        if (prev.length !== websiteData.length) {
           return websiteData;
         }
-        return prev;
+        
+        // Compare IDs and updated_at timestamps for efficient change detection
+        const hasChanges = prev.some((prevWebsite, index) => {
+          const newWebsite = websiteData[index];
+          return !newWebsite || 
+                 prevWebsite.id !== newWebsite.id ||
+                 prevWebsite.updated_at !== newWebsite.updated_at;
+        });
+
+        return hasChanges ? websiteData : prev;
       });
     } catch (error) {
       console.error("Error fetching websites", error);

@@ -298,175 +298,165 @@ export class AnalysisService {
       searchQuery?: string;
     }
   ): Promise<UIAnalysisResult[]> {
-    // Build the base query with correct join structure
-    // Note: prompts.topic_id references topics.id
-    let query = supabase
-      .schema("beekon_data")
-      .from("llm_analysis_results")
-      .select(
-        `
-        *,
-        prompts!inner (
-          id,
-          prompt_text,
-          reporting_text,
-          recommendation_text,
-          strengths,
-          opportunities,
-          topic_id,
-          topics!inner (
-            id,
-            topic_name,
-            website_id
+    const { analysisResultsLoader } = await import("./dataLoaders");
+    
+    try {
+      // Use data loader for efficient batching and caching
+      const results = await analysisResultsLoader.load({
+        websiteId,
+        dateRange: filters?.dateRange,
+      });
+
+      // Apply client-side filtering for better performance
+      let filteredResults = results;
+
+      // Apply topic filter
+      if (filters?.topic && filters.topic !== "all") {
+        filteredResults = filteredResults.filter(result => 
+          result.topic === filters.topic
+        );
+      }
+
+      // Apply LLM provider filter
+      if (filters?.llmProvider && filters.llmProvider !== "all") {
+        filteredResults = filteredResults
+          .filter(result => 
+            result.llm_results.some(llm => llm.llm_provider === filters.llmProvider)
           )
-        )
-      `
-      )
-      .eq("prompts.topics.website_id", websiteId)
-      .order("created_at", { ascending: false });
-
-    // Apply topic filter using the correct foreign key relationship
-    if (filters?.topic && filters.topic !== "all") {
-      query = query.eq("prompts.topic_id", filters.topic);
-    }
-
-    // Apply date range filter
-    if (filters?.dateRange) {
-      query = query.lte("created_at", filters.dateRange.end);
-    }
-
-    // Apply search query filter with proper escaping and security
-    if (filters?.searchQuery && filters.searchQuery.trim()) {
-      const searchTerm = filters.searchQuery
-        .trim()
-        .replace(/[%_\\]/g, "\\$&") // Escape SQL wildcards and backslashes
-        .replace(/'/g, "''"); // Escape single quotes for SQL
-
-
-      // Use correct Supabase OR query syntax with proper join paths
-      query = query.or(
-        `prompts.prompt_text.ilike.%${searchTerm}%,prompts.topics.topic_name.ilike.%${searchTerm}%,response_text.ilike.%${searchTerm}%`
-      );
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Database query error:", error);
-      console.error("Error details:", error.message);
-      console.error("Query filters:", filters);
-      throw error;
-    }
-
-    // Transform data using the shared transformation function
-    let results = this.transformAnalysisData(data, websiteId);
-
-    // Apply LLM provider filter at the data transformation level
-    if (filters?.llmProvider && filters.llmProvider !== "all") {
-      results = results
-        .filter((result) => {
-          // Keep only prompts that have results from the specified LLM provider
-          return result.llm_results.some(
-            (llm) => llm.llm_provider === filters.llmProvider
-          );
-        })
-        .map((result) => {
-          // For display purposes, we can optionally highlight the filtered LLM results
-          // but keep all LLM results to maintain data integrity
-          return {
+          .map(result => ({
             ...result,
-            llm_results: result.llm_results.map((llm) => ({
+            llm_results: result.llm_results.map(llm => ({
               ...llm,
-              // Add a flag to indicate if this is the filtered provider for UI highlighting
               isFiltered: llm.llm_provider === filters.llmProvider,
             })),
-          };
-        });
-    }
+          }));
+      }
 
-    return results;
+      // Apply search query filter
+      if (filters?.searchQuery && filters.searchQuery.trim()) {
+        const searchTerm = filters.searchQuery.toLowerCase().trim();
+        filteredResults = filteredResults.filter(result =>
+          result.prompt.toLowerCase().includes(searchTerm) ||
+          result.topic.toLowerCase().includes(searchTerm) ||
+          result.llm_results.some(llm => 
+            llm.response_text?.toLowerCase().includes(searchTerm)
+          )
+        );
+      }
+
+      return filteredResults;
+    } catch (error) {
+      console.error("Failed to get analysis results:", error);
+      throw error;
+    }
   }
 
   async getTopicsForWebsite(
     websiteId: string
   ): Promise<Array<{ id: string; name: string; resultCount: number }>> {
-    const { data, error } = await supabase
-      .schema("beekon_data")
-      .from("topics")
-      .select(
-        `
-        id, 
-        topic_name,
-        prompts!inner (
-          id,
-          llm_analysis_results (
-            id
+    try {
+      const { topicInfoLoader } = await import("./dataLoaders");
+      const topics = await topicInfoLoader.load(websiteId);
+      return topics;
+    } catch (error) {
+      console.error("Failed to get topics:", error);
+      // Fallback to direct database query if data loader fails
+      try {
+        const { data, error: dbError } = await supabase
+          .schema("beekon_data")
+          .from("topics")
+          .select(
+            `
+            id, 
+            topic_name,
+            prompts!inner (
+              id,
+              llm_analysis_results (
+                id
+              )
+            )
+          `
           )
-        )
-      `
-      )
-      .eq("website_id", websiteId)
-      .eq("is_active", true)
-      .order("topic_name");
+          .eq("website_id", websiteId)
+          .eq("is_active", true)
+          .order("topic_name");
 
-    if (error) throw error;
+        if (dbError) throw dbError;
 
-    return (
-      data?.map((topic) => {
-        const resultCount =
-          topic.prompts?.reduce((total, prompt) => {
-            return total + (prompt.llm_analysis_results?.length || 0);
-          }, 0) || 0;
+        return (
+          data?.map((topic) => {
+            const resultCount =
+              topic.prompts?.reduce((total, prompt) => {
+                return total + (prompt.llm_analysis_results?.length || 0);
+              }, 0) || 0;
 
-        return {
-          id: topic.id,
-          name: topic.topic_name,
-          resultCount,
-        };
-      }) || []
-    );
+            return {
+              id: topic.id,
+              name: topic.topic_name,
+              resultCount,
+            };
+          }) || []
+        );
+      } catch (fallbackError) {
+        console.error("Fallback topics query also failed:", fallbackError);
+        return [];
+      }
+    }
   }
 
   async getAvailableLLMProviders(
     websiteId: string
   ): Promise<Array<{ id: string; name: string; resultCount: number }>> {
-    const { data, error } = await supabase
-      .schema("beekon_data")
-      .from("llm_analysis_results")
-      .select(
-        `
-        llm_provider,
-        prompts!inner (
-          topics!inner (
-            website_id
+    try {
+      const { llmProviderLoader } = await import("./dataLoaders");
+      const providers = await llmProviderLoader.load(websiteId);
+      return providers;
+    } catch (error) {
+      console.error("Failed to get LLM providers:", error);
+      // Fallback to direct database query if data loader fails
+      try {
+        const { data, error: dbError } = await supabase
+          .schema("beekon_data")
+          .from("llm_analysis_results")
+          .select(
+            `
+            llm_provider,
+            prompts!inner (
+              topics!inner (
+                website_id
+              )
+            )
+          `
           )
-        )
-      `
-      )
-      .eq("prompts.topics.website_id", websiteId);
+          .eq("prompts.topics.website_id", websiteId);
 
-    if (error) throw error;
+        if (dbError) throw dbError;
 
-    // Count results by LLM provider
-    const providerCounts = new Map<string, number>();
-    data?.forEach((result) => {
-      const provider = result.llm_provider;
-      providerCounts.set(provider, (providerCounts.get(provider) || 0) + 1);
-    });
+        // Count results by LLM provider
+        const providerCounts = new Map<string, number>();
+        data?.forEach((result) => {
+          const provider = result.llm_provider;
+          providerCounts.set(provider, (providerCounts.get(provider) || 0) + 1);
+        });
 
-    // Map to display format with proper names
-    const providerNames = {
-      chatgpt: "ChatGPT",
-      claude: "Claude",
-      gemini: "Gemini",
-      perplexity: "Perplexity",
-    };
+        // Map to display format with proper names
+        const providerNames = {
+          chatgpt: "ChatGPT",
+          claude: "Claude",
+          gemini: "Gemini",
+          perplexity: "Perplexity",
+        };
 
-    return Array.from(providerCounts.entries()).map(([id, count]) => ({
-      id,
-      name: providerNames[id as keyof typeof providerNames] || id,
-      resultCount: count,
-    }));
+        return Array.from(providerCounts.entries()).map(([id, count]) => ({
+          id,
+          name: providerNames[id as keyof typeof providerNames] || id,
+          resultCount: count,
+        }));
+      } catch (fallbackError) {
+        console.error("Fallback LLM providers query also failed:", fallbackError);
+        return [];
+      }
+    }
   }
 
   subscribeToProgress(
