@@ -1,11 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Competitor, CompetitorInsert, CompetitorUpdate, AnalysisResult, LLMResult } from "@/types/database";
+import {
+  Competitor,
+  CompetitorInsert,
+  CompetitorUpdate,
+  AnalysisResult,
+  LLMResult,
+} from "@/types/database";
 import BaseService from "./baseService";
-import { 
-  competitorAnalysisService, 
-  type CompetitorShareOfVoice, 
+import {
+  competitorAnalysisService,
+  type CompetitorShareOfVoice,
   type CompetitiveGapAnalysis,
-  type CompetitorInsight 
+  type CompetitorInsight,
 } from "./competitorAnalysisService";
 
 export interface CompetitorPerformance {
@@ -63,8 +69,11 @@ export interface CompetitorAnalytics {
 
 export class OptimizedCompetitorService extends BaseService {
   private static instance: OptimizedCompetitorService;
-  protected serviceName = 'competitor' as const;
-  private cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
+  protected serviceName = "competitor" as const;
+  private cache = new Map<
+    string,
+    { data: unknown; timestamp: number; ttl: number }
+  >();
 
   public static getInstance(): OptimizedCompetitorService {
     if (!OptimizedCompetitorService.instance) {
@@ -109,7 +118,7 @@ export class OptimizedCompetitorService extends BaseService {
    */
   async getCompetitors(websiteId: string): Promise<Competitor[]> {
     const cacheKey = `competitors_${websiteId}`;
-    
+
     return this.getCachedData(cacheKey, async () => {
       const { data, error } = await supabase
         .schema("beekon_data")
@@ -131,8 +140,10 @@ export class OptimizedCompetitorService extends BaseService {
     websiteId: string,
     dateRange?: { start: string; end: string }
   ): Promise<CompetitorPerformance[]> {
-    const cacheKey = `performance_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
-    
+    const cacheKey = `performance_${websiteId}_${dateRange?.start || "all"}_${
+      dateRange?.end || "all"
+    }`;
+
     return this.getCachedData(cacheKey, async () => {
       // First check if there are any competitors for this website
       const { data: competitors } = await supabase
@@ -149,12 +160,11 @@ export class OptimizedCompetitorService extends BaseService {
       }
 
       // Use the optimized database function
-      const { data, error } = await supabase
-        .rpc('get_competitor_performance', {
-          p_website_id: websiteId,
-          p_limit: 50,
-          p_offset: 0
-        });
+      const { data, error } = await supabase.rpc("get_competitor_performance", {
+        p_website_id: websiteId,
+        p_limit: 50,
+        p_offset: 0,
+      });
 
       if (error) throw error;
 
@@ -170,13 +180,23 @@ export class OptimizedCompetitorService extends BaseService {
           competitorId: row.competitor_id,
           domain: row.competitor_domain,
           name: row.competitor_name || row.competitor_domain,
-          shareOfVoice: totalMentions > 0 ? Math.round((positiveMentions / totalMentions) * 100) : 0,
+          shareOfVoice:
+            totalMentions > 0
+              ? Math.round((positiveMentions / totalMentions) * 100)
+              : 0,
           averageRank: avgRank && !isNaN(avgRank) ? avgRank : 0,
           mentionCount: totalMentions,
-          sentimentScore: avgSentiment && !isNaN(avgSentiment) ? Math.round((avgSentiment + 1) * 50) : 50,
-          visibilityScore: totalMentions > 0 ? Math.round((positiveMentions / totalMentions) * 100) : 0,
+          sentimentScore:
+            avgSentiment && !isNaN(avgSentiment)
+              ? Math.round((avgSentiment + 1) * 50)
+              : 50,
+          visibilityScore:
+            totalMentions > 0
+              ? Math.round((positiveMentions / totalMentions) * 100)
+              : 0,
           trend: this.calculateTrend(mentionTrend),
-          trendPercentage: mentionTrend && !isNaN(mentionTrend) ? Math.abs(mentionTrend) : 0,
+          trendPercentage:
+            mentionTrend && !isNaN(mentionTrend) ? Math.abs(mentionTrend) : 0,
           lastAnalyzed: row.last_analysis_date || new Date().toISOString(),
           isActive: true,
         };
@@ -192,8 +212,10 @@ export class OptimizedCompetitorService extends BaseService {
     competitorDomain?: string,
     days: number = 30
   ): Promise<CompetitorTimeSeriesData[]> {
-    const cacheKey = `timeseries_${websiteId}_${competitorDomain || 'all'}_${days}`;
-    
+    const cacheKey = `timeseries_${websiteId}_${
+      competitorDomain || "all"
+    }_${days}`;
+
     return this.getCachedData(cacheKey, async () => {
       // First check if there are any competitors for this website
       const { data: competitors } = await supabase
@@ -209,24 +231,23 @@ export class OptimizedCompetitorService extends BaseService {
         return [];
       }
 
-      const { data, error } = await supabase
-        .rpc('get_competitor_time_series', {
-          p_website_id: websiteId,
-          p_competitor_domain: competitorDomain,
-          p_days: days
-        });
+      const { data, error } = await supabase.rpc("get_competitor_time_series", {
+        p_website_id: websiteId,
+        p_competitor_domain: competitorDomain,
+        p_days: days,
+      });
 
       if (error) throw error;
 
       // Group by date
       const timeSeriesMap = new Map<string, CompetitorTimeSeriesData>();
-      
+
       (data || []).forEach((row: Record<string, unknown>) => {
         const dateStr = row.analysis_date;
         if (!timeSeriesMap.has(dateStr)) {
           timeSeriesMap.set(dateStr, {
             date: dateStr,
-            competitors: []
+            competitors: [],
           });
         }
 
@@ -236,17 +257,23 @@ export class OptimizedCompetitorService extends BaseService {
         const dailyAvgRank = row.daily_avg_rank;
 
         timeSeriesMap.get(dateStr)!.competitors.push({
-          competitorId: '', // Would need to join with competitors table
+          competitorId: "", // Would need to join with competitors table
           name: row.competitor_domain,
-          shareOfVoice: dailyMentions > 0 ? Math.round((dailyPositiveMentions / dailyMentions) * 100) : 0,
+          shareOfVoice:
+            dailyMentions > 0
+              ? Math.round((dailyPositiveMentions / dailyMentions) * 100)
+              : 0,
           averageRank: dailyAvgRank && !isNaN(dailyAvgRank) ? dailyAvgRank : 0,
           mentionCount: dailyMentions,
-          sentimentScore: dailyAvgSentiment && !isNaN(dailyAvgSentiment) ? Math.round((dailyAvgSentiment + 1) * 50) : 50
+          sentimentScore:
+            dailyAvgSentiment && !isNaN(dailyAvgSentiment)
+              ? Math.round((dailyAvgSentiment + 1) * 50)
+              : 50,
         });
       });
 
-      return Array.from(timeSeriesMap.values()).sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
+      return Array.from(timeSeriesMap.values()).sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });
   }
@@ -258,8 +285,10 @@ export class OptimizedCompetitorService extends BaseService {
     websiteId: string,
     dateRange?: { start: string; end: string }
   ): Promise<CompetitorAnalytics> {
-    const cacheKey = `analytics_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
-    
+    const cacheKey = `analytics_${websiteId}_${dateRange?.start || "all"}_${
+      dateRange?.end || "all"
+    }`;
+
     return this.getCachedData(cacheKey, async () => {
       // First check if there are any competitors for this website
       const { data: hasCompetitors } = await supabase
@@ -280,7 +309,7 @@ export class OptimizedCompetitorService extends BaseService {
             {
               name: "Your Brand",
               value: 0,
-            }
+            },
           ],
           competitiveGaps: [],
           timeSeriesData: [],
@@ -292,19 +321,25 @@ export class OptimizedCompetitorService extends BaseService {
 
       // Execute all queries in parallel
       const [
-        competitors, 
-        yourBrandResults, 
+        competitors,
+        yourBrandResults,
         timeSeriesData,
         shareOfVoice,
         gapAnalysis,
-        insights
+        insights,
       ] = await Promise.all([
         this.getCompetitorPerformance(websiteId, dateRange),
         this.getAnalysisResultsForWebsite(websiteId, dateRange),
         this.getCompetitorTimeSeriesData(websiteId, undefined, 30),
-        competitorAnalysisService.getCompetitorShareOfVoice(websiteId, dateRange),
-        competitorAnalysisService.getCompetitiveGapAnalysis(websiteId, dateRange),
-        competitorAnalysisService.getCompetitorInsights(websiteId, dateRange)
+        competitorAnalysisService.getCompetitorShareOfVoice(
+          websiteId,
+          dateRange
+        ),
+        competitorAnalysisService.getCompetitiveGapAnalysis(
+          websiteId,
+          dateRange
+        ),
+        competitorAnalysisService.getCompetitorInsights(websiteId, dateRange),
       ]);
 
       // Calculate your brand's metrics efficiently
@@ -332,9 +367,11 @@ export class OptimizedCompetitorService extends BaseService {
       return {
         totalCompetitors: competitors.length,
         activeCompetitors: competitors.filter((c) => c.isActive).length,
-        averageCompetitorRank: competitors.length > 0 
-          ? competitors.reduce((sum, c) => sum + (c.averageRank || 0), 0) / competitors.length
-          : 0,
+        averageCompetitorRank:
+          competitors.length > 0
+            ? competitors.reduce((sum, c) => sum + (c.averageRank || 0), 0) /
+              competitors.length
+            : 0,
         marketShareData,
         competitiveGaps,
         timeSeriesData,
@@ -354,7 +391,7 @@ export class OptimizedCompetitorService extends BaseService {
   ): Promise<Competitor[]> {
     try {
       // Check for existing competitors in batch
-      const domains = competitors.map(c => c.domain);
+      const domains = competitors.map((c) => c.domain);
       const { data: existing } = await supabase
         .schema("beekon_data")
         .from("competitors")
@@ -362,8 +399,12 @@ export class OptimizedCompetitorService extends BaseService {
         .eq("website_id", websiteId)
         .in("competitor_domain", domains);
 
-      const existingDomains = new Set(existing?.map(e => e.competitor_domain) || []);
-      const newCompetitors = competitors.filter(c => !existingDomains.has(c.domain));
+      const existingDomains = new Set(
+        existing?.map((e) => e.competitor_domain) || []
+      );
+      const newCompetitors = competitors.filter(
+        (c) => !existingDomains.has(c.domain)
+      );
 
       if (newCompetitors.length === 0) {
         return [];
@@ -374,7 +415,7 @@ export class OptimizedCompetitorService extends BaseService {
         .schema("beekon_data")
         .from("competitors")
         .insert(
-          newCompetitors.map(comp => ({
+          newCompetitors.map((comp) => ({
             website_id: websiteId,
             competitor_domain: comp.domain,
             competitor_name: comp.name || null,
@@ -387,7 +428,7 @@ export class OptimizedCompetitorService extends BaseService {
 
       // Clear cache
       this.clearCache(`competitors_${websiteId}`);
-      
+
       return data || [];
     } catch (error) {
       console.error("Failed to batch add competitors:", error);
@@ -403,7 +444,9 @@ export class OptimizedCompetitorService extends BaseService {
     domain: string,
     name?: string
   ): Promise<Competitor> {
-    const result = await this.batchAddCompetitors(websiteId, [{ domain, name }]);
+    const result = await this.batchAddCompetitors(websiteId, [
+      { domain, name },
+    ]);
     if (result.length === 0) {
       throw new Error("Competitor already exists");
     }
@@ -430,7 +473,7 @@ export class OptimizedCompetitorService extends BaseService {
 
       // Clear relevant cache
       this.clearCache(`competitors_${data.website_id}`);
-      
+
       return data;
     } catch (error) {
       console.error("Failed to update competitor:", error);
@@ -491,8 +534,8 @@ export class OptimizedCompetitorService extends BaseService {
             type: "application/json",
           });
         case "csv":
-          return new Blob([this.convertToCSV(exportData)], { 
-            type: "text/csv" 
+          return new Blob([this.convertToCSV(exportData)], {
+            type: "text/csv",
           });
         case "pdf":
           // For PDF, return JSON for now (would need PDF library integration)
@@ -513,7 +556,7 @@ export class OptimizedCompetitorService extends BaseService {
    */
   async refreshCompetitorViews(): Promise<void> {
     try {
-      await supabase.rpc('refresh_competitor_performance_views');
+      await supabase.rpc("refresh_competitor_performance_views");
       // Clear all cache after refresh
       this.clearCache();
     } catch (error) {
@@ -531,12 +574,14 @@ export class OptimizedCompetitorService extends BaseService {
     return "stable";
   }
 
-  private calculateBrandMetrics(results: AnalysisResult[]): { overallVisibilityScore: number } {
+  private calculateBrandMetrics(results: AnalysisResult[]): {
+    overallVisibilityScore: number;
+  } {
     if (results.length === 0) return { overallVisibilityScore: 0 };
 
-    const allLLMResults = results.flatMap(r => r.llm_results);
-    const mentionedResults = allLLMResults.filter(r => r.is_mentioned);
-    
+    const allLLMResults = results.flatMap((r) => r.llm_results);
+    const mentionedResults = allLLMResults.filter((r) => r.is_mentioned);
+
     const overallVisibilityScore = Math.round(
       (mentionedResults.length / Math.max(allLLMResults.length, 1)) * 100
     );
@@ -550,12 +595,14 @@ export class OptimizedCompetitorService extends BaseService {
   ): CompetitorComparison[] {
     // Group your brand's results by topic
     const topicMap = new Map<string, number>();
-    
+
     yourBrandResults.forEach((result) => {
-      const mentionedCount = result.llm_results.filter(r => r.is_mentioned).length;
+      const mentionedCount = result.llm_results.filter(
+        (r) => r.is_mentioned
+      ).length;
       const totalCount = result.llm_results.length;
       const score = totalCount > 0 ? (mentionedCount / totalCount) * 100 : 0;
-      
+
       if (!topicMap.has(result.topic)) {
         topicMap.set(result.topic, 0);
       }
@@ -564,7 +611,7 @@ export class OptimizedCompetitorService extends BaseService {
 
     // Create competitive gaps for each topic
     const gaps: CompetitorComparison[] = [];
-    
+
     topicMap.forEach((yourScore, topic) => {
       gaps.push({
         topic,
@@ -590,7 +637,8 @@ export class OptimizedCompetitorService extends BaseService {
 
     // Competitors section
     csv += "Competitors\n";
-    csv += "Name,Domain,Share of Voice,Average Rank,Mentions,Sentiment Score,Trend\n";
+    csv +=
+      "Name,Domain,Share of Voice,Average Rank,Mentions,Sentiment Score,Trend\n";
     competitors.forEach((comp) => {
       csv += `${comp.name},${comp.domain},${comp.shareOfVoice}%,${comp.averageRank},${comp.mentionCount},${comp.sentimentScore}%,${comp.trend}\n`;
     });
@@ -613,7 +661,7 @@ export class OptimizedCompetitorService extends BaseService {
       });
     }
     csv += "\n";
-    
+
     analytics.competitiveGaps.forEach((gap) => {
       csv += `${gap.topic},${gap.yourBrand}`;
       gap.competitors.forEach((comp) => {
@@ -636,7 +684,8 @@ export class OptimizedCompetitorService extends BaseService {
     let query = supabase
       .schema("beekon_data")
       .from("llm_analysis_results")
-      .select(`
+      .select(
+        `
         *,
         prompts!inner (
           prompt_text,
@@ -646,7 +695,8 @@ export class OptimizedCompetitorService extends BaseService {
             website_id
           )
         )
-      `)
+      `
+      )
       .eq("website_id", websiteId)
       .order("analyzed_at", { ascending: false });
 
@@ -661,13 +711,13 @@ export class OptimizedCompetitorService extends BaseService {
 
     // Efficiently transform data
     const resultsMap = new Map<string, AnalysisResult>();
-    
+
     data?.forEach((row) => {
       const topic = row.prompts?.topics;
       if (!topic) return;
 
       const topicName = topic.topic_name;
-      
+
       if (!resultsMap.has(topicName)) {
         resultsMap.set(topicName, {
           topic_name: topicName,
@@ -708,7 +758,7 @@ export class OptimizedCompetitorService extends BaseService {
     try {
       // Get all active competitors for this website
       const competitors = await this.getCompetitors(websiteId);
-      
+
       if (competitors.length === 0) {
         return; // No competitors to analyze
       }
@@ -720,7 +770,7 @@ export class OptimizedCompetitorService extends BaseService {
       // Analyze all competitors for this response
       await competitorAnalysisService.batchAnalyzeCompetitors(
         websiteId,
-        competitors.map(c => c.id),
+        competitors.map((c) => c.id),
         [promptId],
         llmProvider,
         responseTextMap
@@ -729,7 +779,7 @@ export class OptimizedCompetitorService extends BaseService {
       // Clear cache to ensure fresh data on next request
       this.clearCache();
     } catch (error) {
-      console.error('Error analyzing competitors in response:', error);
+      console.error("Error analyzing competitors in response:", error);
       // Don't throw - this is a background operation
     }
   }
@@ -741,10 +791,15 @@ export class OptimizedCompetitorService extends BaseService {
     websiteId: string,
     dateRange?: { start: string; end: string }
   ): Promise<CompetitorShareOfVoice[]> {
-    const cacheKey = `enhanced_sov_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
-    
+    const cacheKey = `enhanced_sov_${websiteId}_${dateRange?.start || "all"}_${
+      dateRange?.end || "all"
+    }`;
+
     return this.getCachedData(cacheKey, async () => {
-      return competitorAnalysisService.getCompetitorShareOfVoice(websiteId, dateRange);
+      return competitorAnalysisService.getCompetitorShareOfVoice(
+        websiteId,
+        dateRange
+      );
     });
   }
 
@@ -755,10 +810,15 @@ export class OptimizedCompetitorService extends BaseService {
     websiteId: string,
     dateRange?: { start: string; end: string }
   ): Promise<CompetitiveGapAnalysis[]> {
-    const cacheKey = `enhanced_gaps_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
-    
+    const cacheKey = `enhanced_gaps_${websiteId}_${dateRange?.start || "all"}_${
+      dateRange?.end || "all"
+    }`;
+
     return this.getCachedData(cacheKey, async () => {
-      return competitorAnalysisService.getCompetitiveGapAnalysis(websiteId, dateRange);
+      return competitorAnalysisService.getCompetitiveGapAnalysis(
+        websiteId,
+        dateRange
+      );
     });
   }
 
@@ -769,10 +829,15 @@ export class OptimizedCompetitorService extends BaseService {
     websiteId: string,
     dateRange?: { start: string; end: string }
   ): Promise<CompetitorInsight[]> {
-    const cacheKey = `insights_${websiteId}_${dateRange?.start || 'all'}_${dateRange?.end || 'all'}`;
-    
+    const cacheKey = `insights_${websiteId}_${dateRange?.start || "all"}_${
+      dateRange?.end || "all"
+    }`;
+
     return this.getCachedData(cacheKey, async () => {
-      return competitorAnalysisService.getCompetitorInsights(websiteId, dateRange);
+      return competitorAnalysisService.getCompetitorInsights(
+        websiteId,
+        dateRange
+      );
     });
   }
 
@@ -784,7 +849,7 @@ export class OptimizedCompetitorService extends BaseService {
       await competitorAnalysisService.refreshCompetitorAnalysisViews();
       this.clearCache(); // Clear all cached data
     } catch (error) {
-      console.error('Error refreshing competitor analysis:', error);
+      console.error("Error refreshing competitor analysis:", error);
       throw error;
     }
   }

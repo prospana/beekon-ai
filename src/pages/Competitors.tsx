@@ -47,7 +47,7 @@ export default function Competitors() {
   // Initialize selectedWebsiteId when websites are loaded
   React.useEffect(() => {
     if (websites && websites.length > 0 && !selectedWebsiteId) {
-      setSelectedWebsiteId(websites[0].id);
+      setSelectedWebsiteId(websites[0]!.id);
     }
   }, [websites, selectedWebsiteId]);
 
@@ -362,7 +362,9 @@ export default function Competitors() {
           setCompetitorToDelete(null);
         }}
         onConfirm={() =>
-          competitorToDelete && handleDeleteCompetitor(competitorToDelete)
+          competitorToDelete
+            ? handleDeleteCompetitor(competitorToDelete)
+            : undefined
         }
         title="Remove Competitor"
         description="Are you sure you want to remove this competitor from tracking? This action cannot be undone and will permanently delete all associated competitor analysis data."
