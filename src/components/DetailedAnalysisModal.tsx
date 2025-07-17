@@ -320,7 +320,7 @@ export function DetailedAnalysisModal({
               {analysisResult.topic || "Unknown Topic"}
             </Badge>
             <Badge variant="outline">
-              Confidence: {analysisResult.confidence || 0}%
+              Confidence: {analysisResult.confidence * 100 || 0}%
             </Badge>
             <span className="text-sm text-muted-foreground">
               {analysisResult.created_at

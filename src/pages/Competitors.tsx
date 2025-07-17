@@ -70,7 +70,6 @@ export default function Competitors() {
     isLoading,
     isRefreshing,
     error,
-    addCompetitor,
     deleteCompetitor,
     exportCompetitorData,
     refreshData,
@@ -207,6 +206,9 @@ export default function Competitors() {
     });
 
     setIsAdding(false);
+    setCompetitorName("");
+    setCompetitorDomain("");
+    setIsAddDialogOpen(false);
   };
 
   const handleDeleteCompetitor = async (competitorId: string) => {
