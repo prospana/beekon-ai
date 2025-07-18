@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user?.id) {
         try {
           const { data, error } = await supabase
-            .schema("public")
+            .schema("beekon_data")
             .from("workspaces")
             .select(`id`)
             .eq("owner_id", user.id)

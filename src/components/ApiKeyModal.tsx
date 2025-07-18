@@ -13,10 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { apiKeyService, ApiKeyUsage } from "@/services/apiKeyService";
+import { apiKeyService, ApiKey as ApiKeyType, ApiKeyUsage } from "@/services/apiKeyService";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import {
   Key,
@@ -40,9 +40,9 @@ interface DisplayApiKey {
   id: string;
   name: string;
   key: string;
-  created: string | null;
+  created: string;
   lastUsed: string;
-  requests: number | null;
+  requests: number;
   status: "active" | "revoked";
 }
 
@@ -50,7 +50,7 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
   const { toast } = useToast();
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [, setIsRevoking] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showKey, setShowKey] = useState<{ [key: string]: boolean }>({});
   const [newKeyName, setNewKeyName] = useState("");
@@ -125,9 +125,9 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
         id: newKeyWithSecret.id,
         name: newKeyWithSecret.name,
         key: newKeyWithSecret.key, // Show full key only for newly generated keys
-        created: newKeyWithSecret.created_at || null,
+        created: newKeyWithSecret.created_at,
         lastUsed: newKeyWithSecret.last_used_at || 'Never',
-        requests: newKeyWithSecret.usage_count || null,
+        requests: newKeyWithSecret.usage_count,
         status: newKeyWithSecret.is_active ? 'active' : 'revoked',
       };
 
@@ -375,14 +375,14 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
                       <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-1">
                           <Calendar className="h-3 w-3" />
-                          <span>Created: {apiKey.created ? new Date(apiKey.created).toLocaleDateString() : 'Unknown'}</span>
+                          <span>Created: {new Date(apiKey.created).toLocaleDateString()}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Activity className="h-3 w-3" />
                           <span>Last used: {apiKey.lastUsed}</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <span>Requests: {apiKey.requests?.toLocaleString() || 0}</span>
+                          <span>Requests: {apiKey.requests.toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
@@ -424,7 +424,7 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
           setShowConfirmation(false);
           setKeyToRevoke(null);
         }}
-        onConfirm={() => keyToRevoke ? handleRevokeKey(keyToRevoke) : Promise.resolve()}
+        onConfirm={() => keyToRevoke && handleRevokeKey(keyToRevoke)}
         title="Revoke API Key"
         description="Are you sure you want to revoke this API key? This action cannot be undone and will immediately stop all requests using this key."
         confirmText="Revoke Key"

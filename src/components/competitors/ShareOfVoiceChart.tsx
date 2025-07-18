@@ -60,9 +60,9 @@ export default function ShareOfVoiceChart({
     const totalVoice = data.reduce((sum, item) => sum + item.value, 0);
     const yourBrand = data.find(item => item.name === "Your Brand");
     const competitors = data.filter(item => item.name !== "Your Brand");
-    const leader = competitors.length > 0 ? competitors.reduce((prev, current) => 
+    const leader = competitors.reduce((prev, current) => 
       prev.value > current.value ? prev : current, competitors[0]
-    ) : null;
+    );
 
     return {
       totalVoice,
@@ -74,7 +74,7 @@ export default function ShareOfVoiceChart({
   }, [data]);
 
   // Only show chart if there are competitors to compare against
-  const hasCompetitors = data.length > 1 || (data.length === 1 && data[0]?.name !== "Your Brand");
+  const hasCompetitors = data.length > 1 || (data.length === 1 && data[0].name !== "Your Brand");
   
   if (!hasCompetitors) return null;
 

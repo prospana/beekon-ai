@@ -4,7 +4,8 @@ import { useToast } from "./use-toast";
 import {
   competitorService,
   type Competitor,
-  type CompetitorPerformance
+  type CompetitorPerformance,
+  type CompetitorAnalytics,
 } from "@/services/competitorService";
 
 export interface CompetitorFilters {

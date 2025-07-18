@@ -164,7 +164,7 @@ export function DetailedAnalysisModal({
 
   const handleSaveFeedback = async (
     llm: string,
-    _feedback: "positive" | "negative"
+    feedback: "positive" | "negative"
   ) => {
     setIsSaving(true);
     try {

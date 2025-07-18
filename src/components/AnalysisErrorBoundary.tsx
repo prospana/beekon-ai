@@ -37,7 +37,7 @@ export class AnalysisErrorBoundary extends React.Component<
     };
   }
 
-  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({
       error,
       errorInfo,
@@ -55,7 +55,7 @@ export class AnalysisErrorBoundary extends React.Component<
     });
   };
 
-  override render() {
+  render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         const FallbackComponent = this.props.fallback;
@@ -116,7 +116,7 @@ export class AnalysisErrorBoundary extends React.Component<
 
 // Error fallback component for analysis-specific errors
 export function AnalysisErrorFallback({
-  error: _error,
+  error,
   resetError,
 }: {
   error: Error;

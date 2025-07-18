@@ -27,13 +27,12 @@ import { useSubscriptionEnforcement } from "@/hooks/useSubscriptionEnforcement";
 import {
   analysisService,
   type AnalysisProgress,
-  type AnalysisSession,
 } from "@/services/analysisService";
 import { ExportFormat, useExportHandler } from "@/lib/export-utils";
 import { exportService } from "@/services/exportService";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, CheckCircle, Plus, Search, X, Zap, Loader2 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { AlertCircle, CheckCircle, Plus, Search, X, Zap } from "lucide-react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -73,20 +72,11 @@ export function AnalysisConfigModal({
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(
     null
   );
-  const [currentAnalysisSession, setCurrentAnalysisSession] = useState<AnalysisSession | null>(
-    null
-  );
-  const [availableTopics, setAvailableTopics] = useState<
-    Array<{ id: string; name: string; resultCount: number }>
-  >([]);
-  const [isLoadingTopics, setIsLoadingTopics] = useState(false);
-  const [topicError, setTopicError] = useState<string | null>(null);
   const { handleExport } = useExportHandler();
 
-  // Fallback topics if no database topics exist
-  const fallbackTopics = [
+  const availableTopics = [
     "AI Tools",
-    "Software Solutions", 
+    "Software Solutions",
     "Machine Learning",
     "Data Analytics",
     "Cloud Services",
@@ -105,61 +95,6 @@ export function AnalysisConfigModal({
     { id: "gemini", name: "Gemini", description: "Google's AI model" },
     { id: "perplexity", name: "Perplexity", description: "AI-powered search" },
   ];
-
-  // Load topics for the selected website
-  const loadWebsiteTopics = useCallback(async () => {
-    if (!websiteId) {
-      setAvailableTopics([]);
-      return;
-    }
-
-    setIsLoadingTopics(true);
-    setTopicError(null);
-
-    try {
-      const websiteTopics = await analysisService.getTopicsForWebsite(websiteId);
-      
-      if (websiteTopics.length > 0) {
-        setAvailableTopics(websiteTopics);
-      } else {
-        // If no topics exist for this website, show fallback topics as suggestions
-        setAvailableTopics(
-          fallbackTopics.map((topic, index) => ({
-            id: `fallback-${index}`,
-            name: topic,
-            resultCount: 0,
-          }))
-        );
-      }
-    } catch (error) {
-      console.error("Failed to load website topics:", error);
-      setTopicError("Failed to load topics. Using default suggestions.");
-      
-      // Fallback to default topics on error
-      setAvailableTopics(
-        fallbackTopics.map((topic, index) => ({
-          id: `fallback-${index}`,
-          name: topic,
-          resultCount: 0,
-        }))
-      );
-      
-      toast({
-        title: "Warning",
-        description: "Could not load website-specific topics. Using default suggestions.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingTopics(false);
-    }
-  }, [websiteId, toast]);
-
-  // Load topics when websiteId changes or modal opens
-  useEffect(() => {
-    if (isOpen && websiteId) {
-      loadWebsiteTopics();
-    }
-  }, [isOpen, websiteId, loadWebsiteTopics]);
 
   const form = useForm<AnalysisConfigFormData>({
     resolver: zodResolver(analysisConfigSchema),
@@ -209,15 +144,11 @@ export function AnalysisConfigModal({
       };
 
       // Start the analysis
-      const sessionId = await analysisService.createAnalysis(config);
-      setCurrentAnalysisId(sessionId);
-      
-      // Get the created session for display purposes
-      const session = await analysisService.getAnalysisSession(sessionId);
-      setCurrentAnalysisSession(session);
+      const analysisId = await analysisService.createAnalysis(config);
+      setCurrentAnalysisId(analysisId);
 
       // Subscribe to progress updates
-      analysisService.subscribeToProgress(sessionId, (progress) => {
+      analysisService.subscribeToProgress(analysisId, (progress) => {
         setAnalysisProgress(progress);
 
         if (progress.status === "completed") {
@@ -225,11 +156,6 @@ export function AnalysisConfigModal({
             title: "Analysis completed!",
             description: `${data.analysisName} analysis has been completed successfully.`,
           });
-
-          // Refresh topics list to include any new topics created
-          if (websiteId) {
-            loadWebsiteTopics();
-          }
 
           // Reset form and close modal after a delay
           setTimeout(() => {
@@ -271,53 +197,20 @@ export function AnalysisConfigModal({
       setCurrentAnalysisId(null);
     }
     setAnalysisProgress(null);
-    setCurrentAnalysisSession(null);
     setIsLoading(false);
-    setTopicError(null);
-    setCustomTopic("");
-    setCustomPrompt("");
     form.reset();
     onClose();
   };
 
   const addCustomTopic = () => {
-    const trimmedTopic = customTopic.trim();
-    if (!trimmedTopic) return;
-
-    const currentTopics = form.watch("topics");
-    
-    // Check for duplicates (case-insensitive)
-    const isDuplicate = currentTopics.some(
-      topic => topic.toLowerCase() === trimmedTopic.toLowerCase()
-    );
-    
-    const existsInAvailable = availableTopics.some(
-      topic => topic.name.toLowerCase() === trimmedTopic.toLowerCase()
-    );
-
-    if (isDuplicate) {
-      toast({
-        title: "Duplicate Topic",
-        description: "This topic is already selected.",
-        variant: "destructive",
-      });
-      return;
+    if (
+      customTopic.trim() &&
+      !form.watch("topics").includes(customTopic.trim())
+    ) {
+      const currentTopics = form.watch("topics");
+      form.setValue("topics", [...currentTopics, customTopic.trim()]);
+      setCustomTopic("");
     }
-
-    if (existsInAvailable && !currentTopics.includes(trimmedTopic)) {
-      // If it exists in available topics, use the exact name from database
-      const existingTopic = availableTopics.find(
-        topic => topic.name.toLowerCase() === trimmedTopic.toLowerCase()
-      );
-      if (existingTopic) {
-        form.setValue("topics", [...currentTopics, existingTopic.name]);
-      }
-    } else {
-      // Add as new custom topic
-      form.setValue("topics", [...currentTopics, trimmedTopic]);
-    }
-    
-    setCustomTopic("");
   };
 
   const removeTopic = (topicToRemove: string) => {
@@ -437,23 +330,6 @@ export function AnalysisConfigModal({
           </div>
         </DialogHeader>
 
-        {/* Analysis Session Info */}
-        {currentAnalysisSession && (
-          <div className="mb-4 p-4 border rounded-lg bg-primary/5">
-            <div className="flex items-center space-x-2 mb-2">
-              <Badge variant="outline" className="text-xs">
-                Session ID: {currentAnalysisSession.id.slice(0, 8)}...
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {currentAnalysisSession.analysis_name}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Analysis session created. You can reference this analysis using the session ID.
-            </p>
-          </div>
-        )}
-
         {/* Progress Tracking */}
         {analysisProgress && (
           <div className="mb-4 p-4 border rounded-lg bg-muted/50">
@@ -513,22 +389,7 @@ export function AnalysisConfigModal({
 
           {/* Topics Selection */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Topics to Monitor</Label>
-              {isLoadingTopics && (
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Loading topics...
-                </div>
-              )}
-              {topicError && (
-                <div className="flex items-center text-sm text-destructive">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {topicError}
-                </div>
-              )}
-            </div>
-            
+            <Label>Topics to Monitor</Label>
             <div className="flex flex-wrap gap-2 mb-3">
               {form.watch("topics").map((topic) => (
                 <Badge
@@ -551,38 +412,24 @@ export function AnalysisConfigModal({
             </div>
 
             <div className="space-y-2">
-              {!isLoadingTopics && (
-                <div className="flex flex-wrap gap-2">
-                  {availableTopics
-                    .filter((topic) => !form.watch("topics").includes(topic.name))
-                    .map((topic) => (
-                      <Badge
-                        key={topic.id}
-                        variant="outline"
-                        className="cursor-pointer hover:bg-accent flex items-center gap-1"
-                        onClick={() => {
-                          const currentTopics = form.watch("topics");
-                          form.setValue("topics", [...currentTopics, topic.name]);
-                        }}
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>{topic.name}</span>
-                        {topic.resultCount > 0 && (
-                          <span className="text-xs bg-muted rounded px-1">
-                            {topic.resultCount}
-                          </span>
-                        )}
-                      </Badge>
-                    ))}
-                </div>
-              )}
-              
-              {isLoadingTopics && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  <span className="text-sm text-muted-foreground">Loading available topics...</span>
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {availableTopics
+                  .filter((topic) => !form.watch("topics").includes(topic))
+                  .map((topic) => (
+                    <Badge
+                      key={topic}
+                      variant="outline"
+                      className="cursor-pointer hover:bg-accent"
+                      onClick={() => {
+                        const currentTopics = form.watch("topics");
+                        form.setValue("topics", [...currentTopics, topic]);
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      {topic}
+                    </Badge>
+                  ))}
+              </div>
 
               <div className="flex gap-3">
                 <Input

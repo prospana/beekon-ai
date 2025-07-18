@@ -1,32 +1,18 @@
-import { LoadingButton } from "@/components/ui/loading-button";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Download, Filter, Globe } from "lucide-react";
-import { Website } from "@/hooks/useWorkspace";
+import { LoadingButton } from '@/components/ui/loading-button';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Plus, RefreshCw, Download, Filter, Globe } from 'lucide-react';
+import { Website } from '@/hooks/useWorkspace';
 
 interface CompetitorsHeaderProps {
   totalCompetitors: number;
   activeCompetitors: number;
-  dateFilter: "7d" | "30d" | "90d";
-  sortBy: "shareOfVoice" | "averageRank" | "mentionCount" | "sentimentScore";
+  dateFilter: '7d' | '30d' | '90d';
+  sortBy: 'shareOfVoice' | 'averageRank' | 'mentionCount' | 'sentimentScore';
   isRefreshing: boolean;
   isExporting: boolean;
   hasData: boolean;
@@ -37,16 +23,14 @@ interface CompetitorsHeaderProps {
   isAdding: boolean;
   websites: Website[];
   websitesLoading: boolean;
-  setDateFilter: (value: "7d" | "30d" | "90d") => void;
-  setSortBy: (
-    value: "shareOfVoice" | "averageRank" | "mentionCount" | "sentimentScore"
-  ) => void;
+  setDateFilter: (value: '7d' | '30d' | '90d') => void;
+  setSortBy: (value: 'shareOfVoice' | 'averageRank' | 'mentionCount' | 'sentimentScore') => void;
   setIsAddDialogOpen: (value: boolean) => void;
   setCompetitorDomain: (value: string) => void;
   setCompetitorName: (value: string) => void;
   setSelectedWebsiteId: (value: string) => void;
   refreshData: () => void;
-  handleExportData: (format: "csv") => void;
+  handleExportData: (format: 'csv') => void;
   handleAddCompetitor: () => void;
 }
 
@@ -79,43 +63,40 @@ export default function CompetitorsHeader({
     <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
       <div>
         <h1 className="text-3xl font-bold">Competitors</h1>
-        <p className="text-muted-foreground flex flex-col">
+        <p className="text-muted-foreground">
           Monitor your competitive landscape in AI responses
           {totalCompetitors > 0 && (
-            <span>
-              {totalCompetitors} competitors tracked • {activeCompetitors}{" "}
-              active
+            <span className="ml-2">
+              • {totalCompetitors} competitors tracked
+              • {activeCompetitors} active
             </span>
           )}
         </p>
       </div>
-
+      
       <div className="flex flex-wrap items-center gap-2">
         {/* Website Selector - Primary control */}
-        <Select
-          value={selectedWebsiteId}
+        <Select 
+          value={selectedWebsiteId} 
           onValueChange={setSelectedWebsiteId}
           disabled={websitesLoading || websites.length === 0 || isRefreshing}
         >
-          <SelectTrigger
-            className={`w-[200px] ${isRefreshing ? "opacity-50" : ""}`}
-          >
+          <SelectTrigger className={`w-[200px] ${isRefreshing ? 'opacity-50' : ''}`}>
             <Globe className="h-4 w-4 mr-2" />
-            <SelectValue
+            <SelectValue 
               placeholder={
-                websitesLoading
-                  ? "Loading websites..."
-                  : websites.length === 0
-                  ? "No websites available"
-                  : "Select website..."
+                websitesLoading 
+                  ? "Loading websites..." 
+                  : websites.length === 0 
+                    ? "No websites available" 
+                    : "Select website..."
               }
             >
               {selectedWebsiteId && websites.length > 0 && (
                 <span className="truncate">
-                  {websites.find((w) => w.id === selectedWebsiteId)
-                    ?.display_name ||
-                    websites.find((w) => w.id === selectedWebsiteId)?.domain ||
-                    "Selected website"}
+                  {websites.find(w => w.id === selectedWebsiteId)?.display_name || 
+                   websites.find(w => w.id === selectedWebsiteId)?.domain || 
+                   'Selected website'}
                 </span>
               )}
             </SelectValue>
@@ -135,7 +116,7 @@ export default function CompetitorsHeader({
                         </span>
                       )}
                     </div>
-                    <Badge
+                    <Badge 
                       variant={website.is_active ? "default" : "secondary"}
                       className="ml-2"
                     >
@@ -151,14 +132,14 @@ export default function CompetitorsHeader({
             )}
           </SelectContent>
         </Select>
-
+        
         {/* Filters Group */}
         <div className="flex items-center gap-1 border-l border-border pl-2">
           <div className="flex gap-1">
-            {(["7d", "30d", "90d"] as const).map((period) => (
+            {(['7d', '30d', '90d'] as const).map((period) => (
               <Button
                 key={period}
-                variant={dateFilter === period ? "default" : "ghost"}
+                variant={dateFilter === period ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setDateFilter(period)}
                 disabled={isRefreshing}
@@ -167,7 +148,7 @@ export default function CompetitorsHeader({
               </Button>
             ))}
           </div>
-
+          
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-[180px]">
               <Filter className="h-4 w-4 mr-2" />
@@ -181,7 +162,7 @@ export default function CompetitorsHeader({
             </SelectContent>
           </Select>
         </div>
-
+        
         {/* Actions Group */}
         <div className="flex items-center gap-2 border-l border-border pl-2">
           <LoadingButton
@@ -194,20 +175,20 @@ export default function CompetitorsHeader({
           >
             Refresh
           </LoadingButton>
-
+          
           <LoadingButton
             variant="outline"
             size="sm"
             loading={isExporting}
             loadingText="Exporting..."
-            onClick={() => handleExportData("csv")}
+            onClick={() => handleExportData('csv')}
             icon={<Download className="h-4 w-4" />}
             disabled={!hasData}
           >
             Export
           </LoadingButton>
         </div>
-
+    
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -225,20 +206,20 @@ export default function CompetitorsHeader({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="websiteSelect">Website</Label>
-                <Select
-                  value={selectedWebsiteId}
+                <Select 
+                  value={selectedWebsiteId} 
                   onValueChange={setSelectedWebsiteId}
                   disabled={websitesLoading || websites.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue
+                    <SelectValue 
                       placeholder={
-                        websitesLoading
-                          ? "Loading websites..."
-                          : websites.length === 0
-                          ? "No websites available"
-                          : "Select a website..."
-                      }
+                        websitesLoading 
+                          ? "Loading websites..." 
+                          : websites.length === 0 
+                            ? "No websites available" 
+                            : "Select a website..."
+                      } 
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -256,10 +237,8 @@ export default function CompetitorsHeader({
                                 </span>
                               )}
                             </div>
-                            <Badge
-                              variant={
-                                website.is_active ? "default" : "secondary"
-                              }
+                            <Badge 
+                              variant={website.is_active ? "default" : "secondary"}
                               className="ml-2"
                             >
                               {website.is_active ? "Active" : "Inactive"}
@@ -295,21 +274,19 @@ export default function CompetitorsHeader({
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
+              <Button 
+                variant="outline" 
                 onClick={() => setIsAddDialogOpen(false)}
                 disabled={isAdding}
               >
                 Cancel
               </Button>
-              <LoadingButton
+              <LoadingButton 
                 onClick={handleAddCompetitor}
                 loading={isAdding}
                 loadingText="Adding..."
                 icon={<Plus className="h-4 w-4" />}
-                disabled={
-                  isAdding || websites.length === 0 || !selectedWebsiteId
-                }
+                disabled={isAdding || websites.length === 0 || !selectedWebsiteId}
               >
                 Add Competitor
               </LoadingButton>

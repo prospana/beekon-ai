@@ -23,6 +23,7 @@ interface FileDropZoneProps {
 
 export function FileDropZone({
   onFileSelect,
+  onFileUpload,
   acceptedTypes = ['image/*'],
   maxSize = 2 * 1024 * 1024, // 2MB default
   multiple = false,
@@ -74,8 +75,6 @@ export function FileDropZone({
     if (!files || files.length === 0) return;
 
     const file = files[0];
-    if (!file) return;
-    
     const validationError = validateFile(file);
     
     if (validationError) {

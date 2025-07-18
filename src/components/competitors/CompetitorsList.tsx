@@ -16,7 +16,7 @@ interface CompetitorsListProps {
 
 export default function CompetitorsList({
   competitorsWithStatus,
-  
+  performance,
   sortBy,
   confirmDelete,
   isDeleting = false,

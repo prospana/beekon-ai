@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ExportFormat,  estimateExportSize } from "@/lib/export-utils";
+import { ExportFormat, getExportFormatDisplayName, estimateExportSize } from "@/lib/export-utils";
 
 // Export button props
 export interface ExportButtonProps {

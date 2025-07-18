@@ -532,7 +532,7 @@ export default function Analysis() {
                   <div className="flex items-center space-x-2">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by analysis name, topic, or prompt..."
+                      placeholder="Search analysis results..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full sm:w-[300px]"
@@ -681,11 +681,6 @@ export default function Analysis() {
                         <CardTitle>{result.prompt}</CardTitle>
                         <div className="flex items-center space-x-2">
                           <Badge variant="outline">{result.topic}</Badge>
-                          {result.analysis_name && (
-                            <Badge variant="secondary" className="text-xs">
-                              {result.analysis_name}
-                            </Badge>
-                          )}
                           <Badge variant="outline" className="text-xs">
                             <Calendar className="h-3 w-3 mr-1" />
                             {new Date(result.created_at).toLocaleDateString()}

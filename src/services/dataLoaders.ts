@@ -41,11 +41,6 @@ export const analysisResultsLoader = new DataLoader<
                 topic_name,
                 website_id
               )
-            ),
-            analysis_sessions (
-              id,
-              analysis_name,
-              status
             )
           `)
           .eq("prompts.topics.website_id", websiteId)
@@ -264,22 +259,6 @@ function transformAnalysisData(
     let recommendationText: string | null = null;
     let promptStrengths: string[] | null = null;
     let promptOpportunities: string[] | null = null;
-    
-    // Extract analysis session information
-    const analysisSessionId = row.analysis_session_id as string | null;
-    let analysisName: string | null = null;
-    let analysisSessionStatus: string | null = null;
-    
-    // Check if we have analysis session data from joins
-    if (row.analysis_sessions) {
-      const session = row.analysis_sessions as {
-        id: string;
-        analysis_name: string;
-        status: string;
-      };
-      analysisName = session.analysis_name;
-      analysisSessionStatus = session.status;
-    }
 
     if (row.prompts) {
       const prompt = row.prompts as {
@@ -321,10 +300,6 @@ function transformAnalysisData(
         prompt_strengths: promptStrengths,
         prompt_opportunities: promptOpportunities,
         llm_results: [],
-        // Include analysis session information
-        analysis_session_id: analysisSessionId,
-        analysis_name: analysisName,
-        analysis_session_status: analysisSessionStatus,
       });
     }
 

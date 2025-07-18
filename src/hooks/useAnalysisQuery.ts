@@ -3,9 +3,10 @@ import { useToast } from "./use-toast";
 import {
   analysisService,
   type AnalysisStatus,
-  type AnalysisConfig
+  type AnalysisConfig,
+  type AnalysisProgress,
 } from "@/services/analysisService";
-
+import { UIAnalysisResult } from "@/types/database";
 
 export interface AnalysisFilters {
   topic?: string;
@@ -74,7 +75,7 @@ export function useAnalysisLLMProviders(websiteId: string) {
 export function useAnalysisProgress(analysisId: string) {
   return useQuery({
     queryKey: analysisKeys.progress(analysisId),
-    queryFn: () => Promise.resolve("In Progress"),
+    queryFn: () => analysisService.getCurrentProgress(analysisId),
     enabled: !!analysisId,
     refetchInterval: 2000, // Poll every 2 seconds for progress updates
     staleTime: 0, // Always considered stale for real-time updates
@@ -202,7 +203,7 @@ export function useAnalysisProgressTracking(analysisId: string) {
   
   return useQuery({
     queryKey: analysisKeys.progress(analysisId),
-    queryFn: () => Promise.resolve({ status: "pending" }),
+    queryFn: () => analysisService.getCurrentProgress(analysisId),
     enabled: !!analysisId,
     refetchInterval: (data) => {
       // Stop polling if analysis is completed or failed
@@ -212,7 +213,7 @@ export function useAnalysisProgressTracking(analysisId: string) {
       return 2000; // Poll every 2 seconds
     },
     staleTime: 0,
-    onSuccess: (data: any) => {
+    onSettled: (data) => {
       // If analysis is completed, invalidate analysis results
       if (data?.status === 'completed') {
         queryClient.invalidateQueries({ queryKey: analysisKeys.all });

@@ -41,18 +41,14 @@ export class ExportHistoryService {
   async createExportRecord(
     exportData: Omit<ExportHistoryInsert, "id" | "created_at" | "updated_at">
   ): Promise<ExportHistoryRecord> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in createExportRecord:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
     const insertData: ExportHistoryInsert = {
       ...exportData,
-      user_id: user.id,
+      user_id: user.user.id,
       status: "pending",
       created_at: new Date().toISOString(),
     };
@@ -124,12 +120,8 @@ export class ExportHistoryService {
     count: number;
     total: number;
   }> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in getUserExportHistory:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
@@ -144,7 +136,7 @@ export class ExportHistoryService {
       .schema("beekon_data")
       .from("export_history")
       .select("*", { count: "exact" })
-      .eq("user_id", user.id);
+      .eq("user_id", user.user.id);
 
     // Apply filters
     if (filters.export_type) {
@@ -194,12 +186,8 @@ export class ExportHistoryService {
    * Get export statistics for the user
    */
   async getExportStatistics(): Promise<ExportStatistics[]> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in getExportStatistics:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
@@ -207,7 +195,7 @@ export class ExportHistoryService {
       .schema("beekon_data")
       .from("export_statistics")
       .select("*")
-      .eq("user_id", user.id);
+      .eq("user_id", user.user.id);
 
     if (error) {
       console.error("Failed to get export statistics:", error);
@@ -221,12 +209,8 @@ export class ExportHistoryService {
    * Get user export summary
    */
   async getUserExportSummary(): Promise<UserExportSummary> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in getUserExportSummary:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
@@ -234,7 +218,7 @@ export class ExportHistoryService {
       .schema("beekon_data")
       .from("export_history")
       .select("*")
-      .eq("user_id", user.id);
+      .eq("user_id", user.user.id);
 
     if (error) {
       console.error("Failed to get export summary:", error);
@@ -302,12 +286,8 @@ export class ExportHistoryService {
    * Delete export record
    */
   async deleteExportRecord(id: string): Promise<void> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in deleteExportRecord:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
@@ -316,7 +296,7 @@ export class ExportHistoryService {
       .from("export_history")
       .delete()
       .eq("id", id)
-      .eq("user_id", user.id);
+      .eq("user_id", user.user.id);
 
     if (error) {
       console.error("Failed to delete export record:", error);
@@ -328,12 +308,8 @@ export class ExportHistoryService {
    * Get export record by ID
    */
   async getExportRecord(id: string): Promise<ExportHistoryRecord | null> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in getExportRecord:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
@@ -342,7 +318,7 @@ export class ExportHistoryService {
       .from("export_history")
       .select("*")
       .eq("id", id)
-      .eq("user_id", user.id)
+      .eq("user_id", user.user.id)
       .single();
 
     if (error) {
@@ -360,12 +336,8 @@ export class ExportHistoryService {
    * Cleanup old export records (older than specified days)
    */
   async cleanupOldRecords(olderThanDays: number = 90): Promise<number> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in cleanupOldRecords:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
@@ -376,7 +348,7 @@ export class ExportHistoryService {
       .schema("beekon_data")
       .from("export_history")
       .delete()
-      .eq("user_id", user.id)
+      .eq("user_id", user.user.id)
       .lt("created_at", cutoffDate.toISOString())
       .select("id");
 
@@ -392,12 +364,8 @@ export class ExportHistoryService {
    * Get recent export activity (last 7 days)
    */
   async getRecentActivity(): Promise<ExportHistoryRecord[]> {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.error("Authentication error in getRecentActivity:", authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-    if (!user) {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
       throw new Error("User not authenticated");
     }
 
@@ -408,7 +376,7 @@ export class ExportHistoryService {
       .schema("beekon_data")
       .from("export_history")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", user.user.id)
       .gte("created_at", sevenDaysAgo.toISOString())
       .order("created_at", { ascending: false })
       .limit(10);
