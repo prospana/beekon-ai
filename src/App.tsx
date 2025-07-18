@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
       retry: (failureCount, error) => {
         // Don't retry on 4xx errors
         if (error && typeof error === 'object' && 'status' in error) {
@@ -45,7 +45,10 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
+  console.log("🎯 App component rendering...");
+  
   useEffect(() => {
+    console.log("🔧 App useEffect running...");
     // Initialize service worker
     try {
       registerSW();
@@ -118,6 +121,8 @@ const App = () => {
     };
   }, []);
 
+  console.log("🎨 App component about to return JSX...");
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

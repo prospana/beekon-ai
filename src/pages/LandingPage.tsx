@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Zap, BarChart3, TrendingUp, Users, Check } from 'lucide-react';
 
 export default function LandingPage() {
+  console.log("🏠 LandingPage component rendering...");
+  
   const features = [
     {
       icon: BarChart3,
