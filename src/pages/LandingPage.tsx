@@ -73,7 +73,7 @@ export default function LandingPage() {
             </div>
             <h1 className="text-2xl font-bold text-primary">Beekon.ai</h1>
           </div>
-          <div className="space-x-4">
+          <div className="flex gap-3">
             <Button variant="ghost" asChild>
               <Link to="/auth">Sign In</Link>
             </Button>
@@ -85,7 +85,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="py-20 px-4">
+      <section className="py-12 sm:py-20 px-4">
         <div className="container mx-auto text-center max-w-4xl">
           <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
             See How AI Chatbots Talk About Your Brand
@@ -100,10 +100,10 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-4 bg-muted/30">
+      <section className="py-12 sm:py-20 px-4 bg-muted/30">
         <div className="container mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Powerful AI Monitoring Features</h2>
+            <h2 className="text-2xl font-bold mb-4">Powerful AI Monitoring Features</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Get comprehensive insights into how AI models perceive and recommend your brand
             </p>
@@ -132,10 +132,10 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-20 px-4">
+      <section className="py-12 sm:py-20 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Simple, Transparent Pricing</h2>
+            <h2 className="text-2xl font-bold mb-4">Simple, Transparent Pricing</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Choose the plan that fits your business needs
             </p>

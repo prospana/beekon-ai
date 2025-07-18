@@ -1,35 +1,35 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { BarChart3, Globe, Search, Users, Settings, Zap } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
-} from '@/components/ui/sidebar';
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { BarChart3, Globe, Search, Settings, Users } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Websites', href: '/websites', icon: Globe },
-  { name: 'Analysis', href: '/analysis', icon: Search },
-  { name: 'Competitors', href: '/competitors', icon: Users },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+  { name: "Websites", href: "/websites", icon: Globe },
+  { name: "Analysis", href: "/analysis", icon: Search },
+  { name: "Competitors", href: "/competitors", icon: Users },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
-  const location = useLocation();
-
+  const { open } = useSidebar();
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-6">
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
-            <Zap className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <h1 className="text-xl font-bold text-primary">Beekon.ai</h1>
+      <SidebarHeader>
+        <div className="flex items-center space-x-2 max-h-12">
+          <img src="/beekon-favicon.png" alt="Beekon" className="h-12 w-auto" />
+          {open && (
+            <span className="font-semibold text-5xl text-primary">Beekon</span>
+          )}
         </div>
       </SidebarHeader>
 
@@ -43,14 +43,14 @@ export function AppSidebar() {
                     <NavLink
                       to={item.href}
                       className={({ isActive }) =>
-                        `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        `flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                           isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            ? "bg-primary text-primary shadow-sm"
+                            : "text-sidebar hover:bg-accent hover:text-accent-foreground hover:scale-[0.98]"
                         }`
                       }
                     >
-                      <item.icon className="h-5 w-5 flex-shrink-0" />
+                      <item.icon className="h-4 w-4 flex-shrink-0" />
                       <span className="ml-3">{item.name}</span>
                     </NavLink>
                   </SidebarMenuButton>

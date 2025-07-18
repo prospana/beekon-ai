@@ -1,276 +1,416 @@
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import React, { useState, useMemo } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Users, MoreHorizontal, Trash2, Globe, TrendingUp, TrendingDown } from 'lucide-react';
+  useCompetitorData,
+  useAddCompetitor,
+  useDeleteCompetitor,
+} from "@/hooks/useCompetitorsQuery";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import CompetitorsHeader from "@/components/competitors/CompetitorsHeader";
+import CompetitorsLoadingState from "@/components/competitors/CompetitorsLoadingState";
+import WorkspaceRequiredState from "@/components/competitors/WorkspaceRequiredState";
+import CompetitorsErrorState from "@/components/competitors/CompetitorsErrorState";
+import ShareOfVoiceChart from "@/components/competitors/ShareOfVoiceChart";
+import CompetitorsList from "@/components/competitors/CompetitorsList";
+import CompetitiveGapChart from "@/components/competitors/CompetitiveGapChart";
+import TimeSeriesChart from "@/components/competitors/TimeSeriesChart";
+import CompetitorsEmptyState from "@/components/competitors/CompetitorsEmptyState";
+import NoAnalyticsState from "@/components/competitors/NoAnalyticsState";
+import CompetitorInsights from "@/components/competitors/CompetitorInsights";
+import { sendN8nWebhook } from "@/lib/http-request";
+import { addProtocol } from "@/lib/utils";
 
 export default function Competitors() {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [competitorDomain, setCompetitorDomain] = useState('');
-  const [competitorName, setCompetitorName] = useState('');
+  const {
+    currentWorkspace,
+    websites,
+    loading: workspaceLoading,
+  } = useWorkspace();
   const { toast } = useToast();
 
-  // Mock data
-  const competitors = [
-    {
-      id: 1,
-      domain: 'competitor1.com',
-      name: 'Competitor One',
-      shareOfVoice: 34,
-      avgRank: 2.1,
-      trend: 'up'
-    },
-    {
-      id: 2,
-      domain: 'rival-company.io',
-      name: 'Rival Company',
-      shareOfVoice: 28,
-      avgRank: 2.8,
-      trend: 'down'
-    },
-    {
-      id: 3,
-      domain: 'bigplayer.tech',
-      name: 'Big Player',
-      shareOfVoice: 18,
-      avgRank: 3.2,
-      trend: 'up'
-    },
-  ];
+  // State for UI controls
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [competitorDomain, setCompetitorDomain] = useState("");
+  const [competitorName, setCompetitorName] = useState("");
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState("");
+  const [isWebhookProcessing, setIsWebhookProcessing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [competitorToDelete, setCompetitorToDelete] = useState<string | null>(
+    null
+  );
+  const [dateFilter, setDateFilter] = useState<"7d" | "30d" | "90d">("30d");
+  const [sortBy, setSortBy] = useState<
+    "shareOfVoice" | "averageRank" | "mentionCount" | "sentimentScore"
+  >("shareOfVoice");
+  const [isExporting, setIsExporting] = useState(false);
 
-  const shareOfVoiceData = [
-    { name: 'Your Brand', value: 42, fill: 'hsl(var(--primary))' },
-    { name: 'Competitor One', value: 34, fill: 'hsl(var(--chart-2))' },
-    { name: 'Rival Company', value: 28, fill: 'hsl(var(--chart-3))' },
-    { name: 'Big Player', value: 18, fill: 'hsl(var(--chart-4))' },
-    { name: 'Others', value: 12, fill: 'hsl(var(--muted))' },
-  ];
+  // Get first website ID for competitor tracking (fallback)
+  const websiteId = websites?.[0]?.id;
 
-  const competitiveGapData = [
-    { topic: 'AI Tools', yourBrand: 85, competitor1: 78, competitor2: 65, competitor3: 72 },
-    { topic: 'Software Solutions', yourBrand: 72, competitor1: 68, competitor2: 81, competitor3: 58 },
-    { topic: 'Machine Learning', yourBrand: 68, competitor1: 82, competitor2: 71, competitor3: 88 },
-    { topic: 'Data Analytics', yourBrand: 91, competitor1: 74, competitor2: 69, competitor3: 77 },
-  ];
+  // Initialize selectedWebsiteId when websites are loaded
+  React.useEffect(() => {
+    if (websites && websites.length > 0 && !selectedWebsiteId) {
+      setSelectedWebsiteId(websites[0]!.id);
+    }
+  }, [websites, selectedWebsiteId]);
 
-  const handleAddCompetitor = () => {
-    if (!competitorDomain) {
+  // Calculate date range (memoized to prevent infinite re-renders)
+  const dateRange = useMemo(() => {
+    const end = new Date();
+    const start = new Date();
+    const days = dateFilter === "7d" ? 7 : dateFilter === "30d" ? 30 : 90;
+    start.setDate(end.getDate() - days);
+    return {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    };
+  }, [dateFilter]);
+
+  // Use competitors React Query hooks
+  const {
+    competitors,
+    competitorsWithStatus,
+    performance,
+    analytics,
+    isLoading,
+    isRefreshing,
+    error,
+    refetch,
+    targetWebsiteId,
+    hasData,
+  } = useCompetitorData(selectedWebsiteId, {
+    dateRange,
+    sortBy,
+    sortOrder: "desc",
+  });
+
+  // Mutations for competitor operations
+  const addCompetitorMutation = useAddCompetitor();
+  const deleteCompetitorMutation = useDeleteCompetitor();
+
+  // Compatibility functions for existing code
+  const refreshData = refetch || (() => {});
+  const clearError = () => {}; // Errors clear automatically in React Query
+  const exportCompetitorData = async (format: "pdf" | "csv" | "json") => {
+    // TODO: Implement export functionality
+    console.log("Export functionality to be implemented", format);
+  };
+
+  // Prepare chart data from analytics (memoized to prevent unnecessary recalculations)
+  const shareOfVoiceData = useMemo(() => {
+    return (
+      analytics?.marketShareData.map((item) => ({
+        name: item.name,
+        value: item.value,
+        fill:
+          item.name === "Your Brand"
+            ? "hsl(var(--primary))"
+            : item.competitorId
+            ? `hsl(var(--chart-${(item.competitorId.length % 4) + 2}))`
+            : "hsl(var(--muted))",
+      })) || []
+    );
+  }, [analytics?.marketShareData]);
+
+  const competitiveGapData = useMemo(() => {
+    return (
+      analytics?.competitiveGaps.map((gap) => {
+        const data: Record<string, number | string> = {
+          topic: gap.topic,
+          yourBrand: gap.yourBrand,
+        };
+        gap.competitors.forEach((comp, index) => {
+          data[`competitor${index + 1}`] = comp.score;
+        });
+        return data;
+      }) || []
+    );
+  }, [analytics?.competitiveGaps]);
+
+  // Competitor insights refresh handler
+  const handleInsightsRefresh = () => {
+    refreshData();
+  };
+
+  const handleAddCompetitor = async () => {
+    if (!websites || websites.length === 0) {
       toast({
-        title: 'Error',
-        description: 'Please enter a competitor domain',
-        variant: 'destructive',
+        title: "Error",
+        description: "No websites available. Please add a website first.",
+        variant: "destructive",
       });
       return;
     }
 
-    toast({
-      title: 'Competitor added!',
-      description: `Started tracking ${competitorDomain}`,
-    });
+    if (!competitorDomain.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a competitor domain",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    setCompetitorDomain('');
-    setCompetitorName('');
-    setIsAddDialogOpen(false);
+    if (!selectedWebsiteId) {
+      toast({
+        title: "Error",
+        description: "Please select a website for competitor tracking",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate that the selected website exists and is available
+    const selectedWebsite = websites?.find((w) => w.id === selectedWebsiteId);
+    if (!selectedWebsite) {
+      toast({
+        title: "Error",
+        description: "Selected website is no longer available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Optionally warn if website is inactive (but allow it)
+    if (!selectedWebsite.is_active) {
+      toast({
+        title: "Warning",
+        description: "You're adding a competitor to an inactive website",
+        variant: "default",
+      });
+    }
+
+    // Validate domain format
+    const domainRegex =
+      /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(\/.*)?$/i;
+
+    if (!domainRegex.test(competitorDomain)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid domain name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Step 1: Add competitor to database using React Query mutation
+      const { id } = await addCompetitorMutation.mutateAsync({
+        websiteId: selectedWebsiteId,
+        domain: addProtocol(competitorDomain),
+        name: competitorName || undefined,
+      });
+
+      // Step 2: Send webhook to N8N for analysis processing
+      setIsWebhookProcessing(true);
+      const response = await sendN8nWebhook("webhook/competitors-onboarding", {
+        website_id: selectedWebsite.id,
+        website_name: selectedWebsite.display_name,
+        website_url: selectedWebsite.domain,
+        competitors_url: addProtocol(competitorDomain),
+        display_name: competitorName,
+        workspace_id: currentWorkspace?.id,
+        competitor_id: id,
+      });
+
+      if (!response.success) {
+        toast({
+          title: "Warning",
+          description:
+            "Competitor added but analysis failed to start. Analysis can be retried later.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Analysis started!",
+          description: `Competitor analysis is now processing for ${
+            competitorName || competitorDomain
+          }.`,
+        });
+      }
+
+      setCompetitorName("");
+      setCompetitorDomain("");
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to add competitor:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to add competitor",
+        variant: "destructive",
+      });
+    } finally {
+      setIsWebhookProcessing(false);
+    }
   };
 
+  const handleDeleteCompetitor = async (competitorId: string) => {
+    try {
+      await deleteCompetitorMutation.mutateAsync({
+        competitorId,
+        websiteId: selectedWebsiteId,
+      });
+      setShowDeleteConfirm(false);
+      setCompetitorToDelete(null);
+    } catch (error) {
+      // Error is already handled by the mutation hook
+    }
+  };
+
+  const confirmDelete = (competitorId: string) => {
+    setCompetitorToDelete(competitorId);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleExportData = async (format: "pdf" | "csv" | "json") => {
+    if (!hasData) {
+      toast({
+        title: "No data to export",
+        description: "Please add competitors before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      await exportCompetitorData(format);
+    } catch (error) {
+      // Error is already handled by the hook
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Show loading state
+  if (workspaceLoading || isLoading) {
+    return (
+      <CompetitorsLoadingState
+        workspaceLoading={workspaceLoading}
+        isLoading={isLoading}
+      />
+    );
+  }
+
+  const workspaceRequiredState = (
+    <WorkspaceRequiredState
+      currentWorkspace={currentWorkspace}
+      websiteId={websiteId}
+    />
+  );
+
+  if (!currentWorkspace || !websiteId) {
+    return workspaceRequiredState;
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Competitors</h1>
-          <p className="text-muted-foreground">
-            Monitor your competitive landscape in AI responses
-          </p>
-        </div>
-        
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Competitor
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Competitor</DialogTitle>
-              <DialogDescription>
-                Add a competitor to track their AI visibility performance
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="competitorDomain">Competitor Domain</Label>
-                <Input
-                  id="competitorDomain"
-                  placeholder="competitor.com"
-                  value={competitorDomain}
-                  onChange={(e) => setCompetitorDomain(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="competitorName">Company Name (Optional)</Label>
-                <Input
-                  id="competitorName"
-                  placeholder="Competitor Inc"
-                  value={competitorName}
-                  onChange={(e) => setCompetitorName(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddCompetitor}>Add Competitor</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+    <>
+      <div className="space-y-6">
+        <CompetitorsHeader
+          totalCompetitors={competitorsWithStatus.length}
+          activeCompetitors={competitorsWithStatus.filter(c => c.analysisStatus === 'completed').length}
+          dateFilter={dateFilter}
+          sortBy={sortBy}
+          isRefreshing={isRefreshing}
+          isExporting={isExporting}
+          hasData={hasData}
+          isAddDialogOpen={isAddDialogOpen}
+          competitorDomain={competitorDomain}
+          competitorName={competitorName}
+          selectedWebsiteId={selectedWebsiteId}
+          isAdding={addCompetitorMutation.isPending || isWebhookProcessing}
+          websites={websites || []}
+          websitesLoading={workspaceLoading}
+          setDateFilter={setDateFilter}
+          setSortBy={setSortBy}
+          setIsAddDialogOpen={setIsAddDialogOpen}
+          setCompetitorDomain={setCompetitorDomain}
+          setCompetitorName={setCompetitorName}
+          setSelectedWebsiteId={setSelectedWebsiteId}
+          refreshData={refreshData}
+          handleExportData={handleExportData}
+          handleAddCompetitor={handleAddCompetitor}
+        />
+
+        {/* Error State */}
+        {error && (
+          <CompetitorsErrorState
+            error={error}
+            isRefreshing={isRefreshing}
+            refreshData={refreshData}
+            clearError={clearError}
+          />
+        )}
+
+        {/* Share of Voice Chart */}
+        <ShareOfVoiceChart
+          data={shareOfVoiceData}
+          dateFilter={dateFilter}
+          isExporting={isExporting}
+          handleExportData={handleExportData}
+        />
+
+        {/* Competitors List */}
+        <CompetitorsList
+          competitorsWithStatus={competitorsWithStatus}
+          performance={performance}
+          sortBy={sortBy}
+          confirmDelete={confirmDelete}
+          isDeleting={deleteCompetitorMutation.isPending}
+        />
+
+        {/* Competitive Gap Analysis */}
+        <CompetitiveGapChart
+          data={competitiveGapData}
+          analytics={analytics}
+          gapAnalysis={analytics?.gapAnalysis || []}
+          dateFilter={dateFilter}
+          isExporting={isExporting}
+          handleExportData={handleExportData}
+        />
+
+        {/* Competitive Intelligence */}
+        <CompetitorInsights
+          insights={analytics?.insights || []}
+          isLoading={isLoading}
+          onRefresh={handleInsightsRefresh}
+        />
+
+        {/* Time Series Chart */}
+        <TimeSeriesChart data={analytics?.timeSeriesData || []} />
+
+        {/* Main Empty State */}
+        {!hasData && !isLoading && (
+          <CompetitorsEmptyState setIsAddDialogOpen={setIsAddDialogOpen} />
+        )}
+
+        {/* Empty Charts State */}
+        {hasData && shareOfVoiceData.length === 0 && (
+          <NoAnalyticsState
+            refreshData={refreshData}
+            isRefreshing={isRefreshing}
+          />
+        )}
       </div>
 
-      {/* Share of Voice Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Share of Voice Comparison</CardTitle>
-          <CardDescription>
-            How your brand compares to competitors in AI responses
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={shareOfVoiceData} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" domain={[0, 50]} />
-              <YAxis dataKey="name" type="category" width={120} />
-              <Tooltip formatter={(value) => [`${value}%`, 'Share of Voice']} />
-              <Bar dataKey="value" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Competitors List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tracked Competitors</CardTitle>
-          <CardDescription>
-            Competitors you're currently monitoring
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {competitors.map((competitor) => (
-              <div key={competitor.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center justify-center w-10 h-10 bg-muted rounded-lg">
-                    <Globe className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium">{competitor.name}</h4>
-                    <p className="text-sm text-muted-foreground">{competitor.domain}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-6">
-                  <div className="text-center">
-                    <div className="text-sm text-muted-foreground">Share of Voice</div>
-                    <div className="font-medium text-lg">{competitor.shareOfVoice}%</div>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="text-sm text-muted-foreground">Avg Rank</div>
-                    <div className="font-medium text-lg">{competitor.avgRank}</div>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="text-sm text-muted-foreground">Trend</div>
-                    <div className="flex justify-center">
-                      {competitor.trend === 'up' ? (
-                        <TrendingUp className="h-5 w-5 text-success" />
-                      ) : (
-                        <TrendingDown className="h-5 w-5 text-destructive" />
-                      )}
-                    </div>
-                  </div>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-destructive">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Competitive Gap Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Competitive Gap Analysis</CardTitle>
-          <CardDescription>
-            Topic-by-topic comparison with your competitors
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={competitiveGapData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="topic" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="yourBrand" name="Your Brand" fill="hsl(var(--primary))" />
-              <Bar dataKey="competitor1" name="Competitor One" fill="hsl(var(--chart-2))" />
-              <Bar dataKey="competitor2" name="Rival Company" fill="hsl(var(--chart-3))" />
-              <Bar dataKey="competitor3" name="Big Player" fill="hsl(var(--chart-4))" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Empty State */}
-      {competitors.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <CardTitle className="mb-2">No competitors tracked yet</CardTitle>
-            <CardDescription className="mb-4">
-              Add competitors to start monitoring your competitive landscape
-            </CardDescription>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First Competitor
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setCompetitorToDelete(null);
+        }}
+        onConfirm={() =>
+          competitorToDelete
+            ? handleDeleteCompetitor(competitorToDelete)
+            : undefined
+        }
+        title="Remove Competitor"
+        description="Are you sure you want to remove this competitor from tracking? This action cannot be undone and will permanently delete all associated competitor analysis data."
+        confirmText="Remove Competitor"
+        variant="destructive"
+      />
+    </>
   );
 }

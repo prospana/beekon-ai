@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run build:*)",
+      "Bash(rm:*)",
+      "Bash(npm install:*)",
+      "Bash(find:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run validate:*)",
+      "Bash(rg:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(npx supabase link:*)",
+      "Bash(npx supabase:*)",
+      "Bash(ls:*)",
+      "Bash(diff:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx rimraf:*)",
+      "Bash(mv:*)",
+      "WebFetch(domain:github.com)"
+    ],
+    "deny": []
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "enableAllProjectMcpServers": true
+}

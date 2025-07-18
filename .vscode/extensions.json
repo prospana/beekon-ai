@@ -1,0 +1,34 @@
+{
+  "recommendations": [
+    "ms-vscode.vscode-typescript-next",
+    "ms-vscode.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-vscode.debugger-for-chrome",
+    "ms-vscode.vscode-edge-debug2",
+    "ms-vscode.vscode-json",
+    "bradlc.vscode-tailwindcss",
+    "usernamehw.errorlens",
+    "gruntfuggly.todo-tree",
+    "christian-kohler.path-intellisense",
+    "ms-vscode.vscode-typescript-next",
+    "formulahendry.auto-rename-tag",
+    "ms-vscode.vscode-react-javascript",
+    "ms-vscode.vscode-react-typescript",
+    "supabase.supabase-vscode",
+    "github.copilot",
+    "ms-vscode.vscode-debugger-node",
+    "ms-vscode.vscode-debugger-chrome",
+    "ms-vscode.vscode-debugger-edge",
+    "ms-vscode.vscode-debugger-firefox",
+    "ms-vscode.vscode-debugger-webkit",
+    "ms-vscode.vscode-debugger-sourcemap",
+    "ms-vscode.vscode-debugger-preview",
+    "ms-vscode.vscode-debugger-terminal",
+    "ms-vscode.vscode-debugger-utils"
+  ],
+  "unwantedRecommendations": [
+    "ms-vscode.vscode-typescript",
+    "hookyqr.beautify",
+    "dbaeumer.jshint"
+  ]
+}
