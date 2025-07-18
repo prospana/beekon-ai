@@ -3,6 +3,22 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+// Crypto polyfill plugin
+const cryptoPolyfill = () => {
+  return {
+    name: 'crypto-polyfill',
+    configResolved(config: any) {
+      if (config.command === 'build') {
+        // Add crypto polyfill for build
+        config.define = {
+          ...config.define,
+          global: 'globalThis',
+        };
+      }
+    },
+  };
+};
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const isDevelopment = mode === 'development';
@@ -18,6 +34,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [
+      cryptoPolyfill(),
       react({
         devTarget: 'es2015',
       }),
@@ -27,6 +44,12 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+    },
+    define: {
+      __DEV__: JSON.stringify(isDevelopment),
+      __PROD__: JSON.stringify(mode === 'production'),
+      // Add crypto polyfill
+      global: 'globalThis',
     },
     build: {
       sourcemap: isDevelopment ? 'inline' : false,
@@ -121,10 +144,6 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-    },
-    define: {
-      __DEV__: JSON.stringify(isDevelopment),
-      __PROD__: JSON.stringify(mode === 'production'),
     },
     optimizeDeps: {
       include: ['react', 'react-dom'],
