@@ -15,6 +15,12 @@ export interface CompetitorFilters {
   showInactive?: boolean;
 }
 
+export interface CompetitorWithStatus extends Competitor {
+  analysisStatus: "completed" | "in_progress" | "pending";
+  performance?: CompetitorPerformance;
+  addedAt: string;
+}
+
 // Query keys for consistent caching
 export const competitorKeys = {
   all: ['competitors'] as const,
@@ -111,8 +117,41 @@ export function useCompetitorData(websiteId: string, filters: CompetitorFilters 
   const filteredCompetitors = competitorsQuery.data ? 
     (filters.showInactive ? competitorsQuery.data : competitorsQuery.data.filter(c => c.is_active)) : [];
 
+  // Merge competitors with performance data and add analysis status
+  const competitorsWithStatus: CompetitorWithStatus[] = filteredCompetitors.map((competitor) => {
+    const performanceData = sortedPerformance.find(p => p.competitorId === competitor.id);
+    
+    // Determine analysis status based on performance data and creation time
+    let analysisStatus: "completed" | "in_progress" | "pending" = "pending";
+    
+    if (performanceData) {
+      // Has performance data - analysis is completed
+      analysisStatus = "completed";
+    } else {
+      // No performance data - check if recently added (within last 30 minutes = in_progress)
+      const addedAt = new Date(competitor.created_at);
+      const now = new Date();
+      const timeDiff = now.getTime() - addedAt.getTime();
+      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+      
+      if (minutesAgo <= 30) {
+        analysisStatus = "in_progress";
+      } else {
+        analysisStatus = "pending";
+      }
+    }
+
+    return {
+      ...competitor,
+      analysisStatus,
+      performance: performanceData,
+      addedAt: competitor.created_at,
+    };
+  });
+
   return {
     competitors: filteredCompetitors,
+    competitorsWithStatus,
     performance: sortedPerformance,
     analytics: analyticsQuery.data || null,
     isLoading: queries.some((q) => q.isLoading),

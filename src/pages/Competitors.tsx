@@ -70,6 +70,7 @@ export default function Competitors() {
   // Use competitors React Query hooks
   const {
     competitors,
+    competitorsWithStatus,
     performance,
     analytics,
     isLoading,
@@ -308,8 +309,8 @@ export default function Competitors() {
     <>
       <div className="space-y-6">
         <CompetitorsHeader
-          totalCompetitors={analytics?.totalCompetitors || 0}
-          activeCompetitors={analytics?.activeCompetitors || 0}
+          totalCompetitors={competitorsWithStatus.length}
+          activeCompetitors={competitorsWithStatus.filter(c => c.analysisStatus === 'completed').length}
           dateFilter={dateFilter}
           sortBy={sortBy}
           isRefreshing={isRefreshing}
@@ -353,6 +354,7 @@ export default function Competitors() {
 
         {/* Competitors List */}
         <CompetitorsList
+          competitorsWithStatus={competitorsWithStatus}
           performance={performance}
           sortBy={sortBy}
           confirmDelete={confirmDelete}
