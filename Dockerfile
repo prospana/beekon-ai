@@ -3,14 +3,20 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# Install dependencies for build
+RUN apk add --no-cache libc6-compat
+
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
+
+# Set NODE_ENV for build
+ENV NODE_ENV=production
 
 # Build the app
 RUN npm run build
