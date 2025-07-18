@@ -142,6 +142,10 @@ export interface UIAnalysisResult {
   prompt_opportunities: string[] | null;
   llm_results: UILLMResult[];
   insights?: AnalysisInsights;
+  // Analysis session information
+  analysis_session_id?: string | null;
+  analysis_name?: string | null;
+  analysis_session_status?: string | null;
 }
 
 // UI-specific LLM result format
