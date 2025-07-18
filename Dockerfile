@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20.11-alpine AS builder
 
 WORKDIR /app
 
@@ -9,8 +9,11 @@ RUN apk add --no-cache libc6-compat
 # Copy package files
 COPY package*.json ./
 
+# Show Node.js version for debugging
+RUN node --version && npm --version
+
 # Install ALL dependencies (including dev dependencies for build)
-RUN npm ci
+RUN npm ci --verbose
 
 # Copy source code
 COPY . .
