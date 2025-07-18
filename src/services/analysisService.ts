@@ -17,6 +17,22 @@ export interface AnalysisConfig {
   scheduleAnalysis: boolean;
 }
 
+export interface AnalysisSession {
+  id: string;
+  analysis_name: string;
+  website_id: string;
+  user_id: string;
+  workspace_id: string;
+  status: AnalysisStatus;
+  configuration: AnalysisConfig;
+  progress_data: AnalysisProgress | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Re-export for backward compatibility
 export type { AnalysisResult, LLMResult };
 
@@ -42,8 +58,31 @@ export class AnalysisService {
     return AnalysisService.instance;
   }
 
-  async createAnalysis(config: AnalysisConfig): Promise<string> {
+  async createAnalysis(config: AnalysisConfig, userId?: string, workspaceId?: string): Promise<string> {
     try {
+      // Get current user if not provided
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User must be authenticated to create analysis");
+        userId = user.id;
+      }
+
+      // Get workspace ID from website if not provided
+      if (!workspaceId) {
+        const { data: website } = await supabase
+          .schema("beekon_data")
+          .from("websites")
+          .select("workspace_id")
+          .eq("id", config.websiteId)
+          .single();
+        
+        if (!website) throw new Error("Website not found");
+        workspaceId = website.workspace_id;
+      }
+
+      // Create analysis session first
+      const analysisSession = await this.createAnalysisSession(config, userId, workspaceId);
+
       // First, create topics if they don't exist
       const topicIds = await this.ensureTopicsExist(
         config.websiteId,
@@ -57,12 +96,12 @@ export class AnalysisService {
       );
 
       // Start the analysis process
-      const analysisId = await this.startAnalysis(config, promptIds);
+      await this.startAnalysis(analysisSession.id, config, promptIds);
 
       // Trigger N8N webhook for actual analysis
-      await this.triggerAnalysisWebhook(analysisId, config);
+      await this.triggerAnalysisWebhook(analysisSession.id, config);
 
-      return analysisId;
+      return analysisSession.id;
     } catch (error) {
       console.error("Failed to create analysis:", error);
       throw error;
@@ -138,57 +177,114 @@ export class AnalysisService {
     return promptIds;
   }
 
+  private async createAnalysisSession(
+    config: AnalysisConfig,
+    userId: string,
+    workspaceId: string
+  ): Promise<AnalysisSession> {
+    const { data, error } = await supabase
+      .schema("beekon_data")
+      .from("analysis_sessions")
+      .insert({
+        analysis_name: config.analysisName,
+        website_id: config.websiteId,
+        user_id: userId,
+        workspace_id: workspaceId,
+        status: "pending",
+        configuration: config,
+        progress_data: {
+          analysisId: "", // Will be set to session ID
+          status: "pending",
+          progress: 0,
+          currentStep: "Initializing analysis...",
+          completedSteps: 0,
+          totalSteps: config.customPrompts.length * config.llmModels.length,
+        },
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as AnalysisSession;
+  }
+
   private async startAnalysis(
+    sessionId: string,
     config: AnalysisConfig,
     promptIds: string[]
-  ): Promise<string> {
-    // Create analysis record (we'll use a UUID as analysis ID)
-    const analysisId = crypto.randomUUID();
+  ): Promise<void> {
+    // Update analysis session status and progress
+    await this.updateAnalysisSession(sessionId, {
+      status: "pending",
+      started_at: new Date().toISOString(),
+      progress_data: {
+        analysisId: sessionId,
+        status: "pending",
+        progress: 0,
+        currentStep: "Initializing analysis...",
+        completedSteps: 0,
+        totalSteps: promptIds.length * config.llmModels.length,
+      },
+    });
 
     // Initialize progress tracking
-    this.updateProgress(analysisId, {
-      analysisId,
+    this.updateProgress(sessionId, {
+      analysisId: sessionId,
       status: "pending",
       progress: 0,
       currentStep: "Initializing analysis...",
       completedSteps: 0,
       totalSteps: promptIds.length * config.llmModels.length,
     });
-
-    return analysisId;
   }
 
   private async triggerAnalysisWebhook(
-    analysisId: string,
+    sessionId: string,
     config: AnalysisConfig
   ) {
     try {
       const webhookPayload = {
-        analysisId,
+        analysisId: sessionId,
+        sessionId,
         config,
         timestamp: new Date().toISOString(),
       };
 
       await sendN8nWebhook("analysis/start", webhookPayload);
 
-      this.updateProgress(analysisId, {
-        analysisId,
-        status: "running",
+      const progressData = {
+        analysisId: sessionId,
+        status: "running" as AnalysisStatus,
         progress: 10,
         currentStep: "Starting LLM analysis...",
         completedSteps: 0,
         totalSteps: config.llmModels.length * config.customPrompts.length,
+      };
+
+      await this.updateAnalysisSession(sessionId, {
+        status: "running",
+        progress_data: progressData,
       });
+
+      this.updateProgress(sessionId, progressData);
     } catch (error) {
-      this.updateProgress(analysisId, {
-        analysisId,
-        status: "failed",
+      const errorProgressData = {
+        analysisId: sessionId,
+        status: "failed" as AnalysisStatus,
         progress: 0,
         currentStep: "Failed to start analysis",
         completedSteps: 0,
         totalSteps: 0,
         error: error instanceof Error ? error.message : "Unknown error",
+      };
+
+      await this.updateAnalysisSession(sessionId, {
+        status: "failed",
+        error_message: error instanceof Error ? error.message : "Unknown error",
+        progress_data: errorProgressData,
       });
+
+      this.updateProgress(sessionId, errorProgressData);
       throw error;
     }
   }
@@ -215,6 +311,22 @@ export class AnalysisService {
       let recommendationText: string | null = null;
       let promptStrengths: string[] | null = null;
       let promptOpportunities: string[] | null = null;
+      
+      // Extract analysis session information
+      const analysisSessionId = row.analysis_session_id as string | null;
+      let analysisName: string | null = null;
+      let analysisSessionStatus: string | null = null;
+      
+      // Check if we have analysis session data from joins
+      if (row.analysis_sessions) {
+        const session = row.analysis_sessions as {
+          id: string;
+          analysis_name: string;
+          status: string;
+        };
+        analysisName = session.analysis_name;
+        analysisSessionStatus = session.status;
+      }
 
       if (row.prompts) {
         // Data from joined query with nested topics
@@ -267,6 +379,10 @@ export class AnalysisService {
           prompt_strengths: promptStrengths,
           prompt_opportunities: promptOpportunities,
           llm_results: [],
+          // Include analysis session information
+          analysis_session_id: analysisSessionId,
+          analysis_name: analysisName,
+          analysis_session_status: analysisSessionStatus,
         });
       }
 
@@ -342,6 +458,7 @@ export class AnalysisService {
           (result) =>
             result.prompt.toLowerCase().includes(searchTerm) ||
             result.topic.toLowerCase().includes(searchTerm) ||
+            (result.analysis_name && result.analysis_name.toLowerCase().includes(searchTerm)) ||
             result.llm_results.some((llm) =>
               llm.response_text?.toLowerCase().includes(searchTerm)
             )
@@ -484,23 +601,101 @@ export class AnalysisService {
     }
   }
 
+  private async updateAnalysisSession(
+    sessionId: string, 
+    updates: Partial<{
+      status: AnalysisStatus;
+      progress_data: AnalysisProgress;
+      error_message: string;
+      started_at: string;
+      completed_at: string;
+    }>
+  ): Promise<void> {
+    const { error } = await supabase
+      .schema("beekon_data")
+      .from("analysis_sessions")
+      .update(updates)
+      .eq("id", sessionId);
+
+    if (error) {
+      console.error("Failed to update analysis session:", error);
+      throw error;
+    }
+  }
+
+  async getAnalysisSession(sessionId: string): Promise<AnalysisSession | null> {
+    const { data, error } = await supabase
+      .schema("beekon_data")
+      .from("analysis_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
+
+    if (error) {
+      console.error("Failed to get analysis session:", error);
+      return null;
+    }
+
+    return data as AnalysisSession;
+  }
+
+  async getAnalysisSessionsForWebsite(websiteId: string): Promise<AnalysisSession[]> {
+    const { data, error } = await supabase
+      .schema("beekon_data")
+      .from("analysis_sessions")
+      .select("*")
+      .eq("website_id", websiteId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Failed to get analysis sessions:", error);
+      return [];
+    }
+
+    return data as AnalysisSession[];
+  }
+
   // This method would be called by webhook handlers or polling
   async handleAnalysisUpdate(
-    analysisId: string,
+    sessionId: string,
     update: Partial<AnalysisProgress>
   ) {
-    const callback = this.progressCallbacks.get(analysisId);
+    // Update the analysis session in the database
+    const progressData = {
+      ...update,
+      analysisId: sessionId,
+    };
+
+    await this.updateAnalysisSession(sessionId, {
+      progress_data: progressData as AnalysisProgress,
+      ...(update.status === "completed" && { 
+        status: "completed", 
+        completed_at: new Date().toISOString() 
+      }),
+      ...(update.status === "failed" && { 
+        status: "failed", 
+        error_message: update.error 
+      }),
+    });
+
+    // Update in-memory progress callbacks
+    const callback = this.progressCallbacks.get(sessionId);
     if (callback) {
-      const currentProgress = this.getCurrentProgress(analysisId);
+      const currentProgress = await this.getCurrentProgress(sessionId);
       callback({ ...currentProgress, ...update });
     }
   }
 
-  private getCurrentProgress(analysisId: string): AnalysisProgress {
-    // This would typically be stored in a state management system
-    // For now, returning a default progress
+  private async getCurrentProgress(sessionId: string): Promise<AnalysisProgress> {
+    const session = await this.getAnalysisSession(sessionId);
+    
+    if (session && session.progress_data) {
+      return session.progress_data;
+    }
+
+    // Fallback if no progress data is found
     return {
-      analysisId,
+      analysisId: sessionId,
       status: "running",
       progress: 0,
       currentStep: "Processing...",
@@ -518,6 +713,7 @@ export class AnalysisService {
     sentimentScore?: number;
     responseText?: string;
     confidenceScore?: number;
+    analysisSessionId?: string;
   }) {
     const { error } = await supabase
       .schema("beekon_data")
@@ -531,6 +727,7 @@ export class AnalysisService {
         sentiment_score: result.sentimentScore,
         response_text: result.responseText,
         confidence_score: result.confidenceScore,
+        analysis_session_id: result.analysisSessionId,
         analyzed_at: new Date().toISOString(),
       });
 

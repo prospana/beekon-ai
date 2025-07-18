@@ -82,8 +82,8 @@ export default function CompetitorsHeader({
         <p className="text-muted-foreground flex flex-col">
           Monitor your competitive landscape in AI responses
           {totalCompetitors > 0 && (
-            <span className="ml-2">
-              • {totalCompetitors} competitors tracked • {activeCompetitors}{" "}
+            <span>
+              {totalCompetitors} competitors tracked • {activeCompetitors}{" "}
               active
             </span>
           )}
