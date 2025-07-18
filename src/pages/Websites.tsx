@@ -275,20 +275,34 @@ export default function Websites() {
         includeAnalysisHistory: true,
       });
 
+      // Use the enhanced export handler
       await handleExport(
         () => Promise.resolve(blob),
         {
-          filename: "websites-export",
+          filename: "website-portfolio-report",
           format,
           includeTimestamp: true,
           metadata: {
             websiteCount: websites.length,
-            exportType: "full_website_data",
+            activeWebsites: websites.filter(w => w.is_active).length,
+            monitoringEnabled: websites.filter(w => w.monitoring_enabled).length,
+            exportType: "website_portfolio",
+            generatedBy: "Beekon AI",
           },
         }
       );
+
+      toast({
+        title: "Export Successful",
+        description: `Website portfolio exported as ${format.toUpperCase()}`,
+      });
     } catch (error) {
       console.error("Export failed:", error);
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Failed to export websites data",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
@@ -306,22 +320,39 @@ export default function Websites() {
 
       const website = websites?.find(w => w.id === websiteId);
       const websiteName = website?.display_name || website?.domain || "website";
+      const metrics = getWebsiteMetrics(websiteId);
 
       await handleExport(
         () => Promise.resolve(blob),
         {
-          filename: `${websiteName.replace(/[^a-zA-Z0-9]/g, '-')}-export`,
+          filename: `${websiteName.replace(/[^a-zA-Z0-9]/g, '-')}-detailed-report`,
           format,
           includeTimestamp: true,
           metadata: {
             websiteId,
             websiteName,
-            exportType: "single_website_data",
+            websiteDomain: website?.domain,
+            totalTopics: metrics?.totalTopics || 0,
+            avgVisibility: metrics?.avgVisibility || 0,
+            isActive: website?.is_active,
+            monitoringEnabled: website?.monitoring_enabled,
+            exportType: "single_website_detailed",
+            generatedBy: "Beekon AI",
           },
         }
       );
+
+      toast({
+        title: "Export Successful",
+        description: `${websiteName} data exported as ${format.toUpperCase()}`,
+      });
     } catch (error) {
       console.error("Export failed:", error);
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Failed to export website data",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }

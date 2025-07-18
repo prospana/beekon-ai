@@ -122,27 +122,97 @@ export default function Dashboard() {
 
     setIsExporting(true);
     try {
-      // Create real export using dashboard service with enhanced formats
-      const blob = await dashboardService.exportDashboardData(
-        websiteIds,
-        format
-      );
+      // Import the export service dynamically
+      const { exportService } = await import("@/services/exportService");
+      
+      // Prepare comprehensive dashboard export data
+      const dashboardExportData = {
+        summary: {
+          totalWebsites: websiteIds.length,
+          period: dateFilter,
+          exportDate: new Date().toISOString(),
+          totalAnalyses: metrics?.totalAnalyses || 0,
+          averageConfidence: metrics?.averageConfidence || 0,
+          averageSentiment: metrics?.averageSentiment || 0,
+          mentionRate: metrics?.mentionRate || 0,
+          topPerformingTopic: topicPerformance?.[0]?.topic || "N/A",
+          sentimentTrend: getSentimentLabel(metrics?.averageSentiment || 0),
+        },
+        metrics: metrics || {},
+        timeSeriesData: timeSeriesData || [],
+        topicPerformance: topicPerformance || [],
+        llmPerformance: llmPerformance || [],
+        websitePerformance: websitePerformance || [],
+        websites: websites?.map(w => ({
+          id: w.id,
+          name: w.display_name,
+          domain: w.domain,
+          isActive: w.is_active,
+          monitoringEnabled: w.monitoring_enabled,
+        })) || [],
+      };
+
+      // Create export content with proper structure
+      const exportContent = {
+        title: `Dashboard Analytics Report - ${dateFilter.toUpperCase()}`,
+        data: dashboardExportData,
+        exportedAt: new Date().toISOString(),
+        totalRecords: websiteIds.length,
+        filters: {
+          period: dateFilter,
+          totalWebsites: websiteIds.length,
+          activeWebsites: websites?.filter(w => w.is_active).length || 0,
+          dataTypes: ["metrics", "timeSeriesData", "topicPerformance", "llmPerformance", "websitePerformance"],
+        },
+        dateRange: {
+          start: new Date(Date.now() - (dateFilter === "7d" ? 7 : dateFilter === "30d" ? 30 : 90) * 24 * 60 * 60 * 1000).toISOString(),
+          end: new Date().toISOString(),
+        },
+        dataType: "dashboard", // Use dashboard field mapping
+        metadata: {
+          exportType: "dashboard_analytics",
+          generatedBy: "Beekon AI Export Service",
+          workspaceId: currentWorkspace?.id,
+          totalWebsites: websiteIds.length,
+          analysisCount: metrics?.totalAnalyses || 0,
+          averageConfidence: metrics?.averageConfidence || 0,
+          averageSentiment: metrics?.averageSentiment || 0,
+          mentionRate: metrics?.mentionRate || 0,
+        },
+      };
+
+      const blob = await exportService.exportData(exportContent, format, { 
+        exportType: "dashboard", 
+        customFilename: `dashboard_analytics_${dateFilter}_${new Date().toISOString().split('T')[0]}` 
+      });
 
       await handleExport(
         () => Promise.resolve(blob),
         {
-          filename: "dashboard-export",
+          filename: `dashboard-analytics-${dateFilter}`,
           format,
           includeTimestamp: true,
           metadata: {
             websiteCount: websiteIds.length,
-            exportType: "dashboard_data",
-            dataTypes: ["metrics", "timeSeriesData", "topicPerformance"],
+            period: dateFilter,
+            exportType: "dashboard_analytics",
+            dataTypes: ["metrics", "timeSeriesData", "topicPerformance", "llmPerformance", "websitePerformance"],
+            generatedBy: "Beekon AI",
           },
         }
       );
+
+      toast({
+        title: "Export Successful",
+        description: `Dashboard analytics exported as ${format.toUpperCase()}`,
+      });
     } catch (error) {
       console.error("Export failed:", error);
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Failed to export dashboard data",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
