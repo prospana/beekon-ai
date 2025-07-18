@@ -9,11 +9,8 @@ RUN apk add --no-cache libc6-compat
 # Copy package files
 COPY package*.json ./
 
-# Show Node.js version for debugging
-RUN node --version && npm --version
-
 # Install ALL dependencies (including dev dependencies for build)
-RUN npm ci --verbose
+RUN npm ci
 
 # Copy source code
 COPY . .

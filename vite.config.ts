@@ -3,22 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// Crypto polyfill plugin
-const cryptoPolyfill = () => {
-  return {
-    name: 'crypto-polyfill',
-    configResolved(config: any) {
-      if (config.command === 'build') {
-        // Add crypto polyfill for build
-        config.define = {
-          ...config.define,
-          global: 'globalThis',
-        };
-      }
-    },
-  };
-};
-
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const isDevelopment = mode === 'development';
@@ -34,7 +18,6 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [
-      cryptoPolyfill(),
       react({
         devTarget: 'es2015',
       }),
