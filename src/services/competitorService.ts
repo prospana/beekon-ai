@@ -10,9 +10,17 @@ import BaseService from "./baseService";
 import {
   competitorAnalysisService,
   type CompetitorShareOfVoice,
-  type CompetitiveGapAnalysis,
   type CompetitorInsight,
 } from "./competitorAnalysisService";
+
+export interface CompetitiveGapAnalysis {
+  competitorId: string;
+  competitorName: string;
+  marketCompetitiveness: number;
+  yourPerformance: number;
+  marketSize: number;
+  gapScore: number;
+}
 
 export interface CompetitorPerformance {
   competitorId: string;

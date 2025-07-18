@@ -67,8 +67,8 @@ export function ExportHistoryModal({
   const [statusFilter, setStatusFilter] = useState<ExportStatus | "all">("all");
   const [typeFilter, setTypeFilter] = useState<ExportType | "all">("all");
   const [formatFilter, setFormatFilter] = useState<ExportFormat | "all">("all");
-  const [, setSortBy] = useState<"created_at" | "updated_at" | "file_size">("created_at");
-  const [, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [_sortBy, _setSortBy] = useState<"created_at" | "updated_at" | "file_size">("created_at");
+  const [_sortOrder, _setSortOrder] = useState<"asc" | "desc">("desc");
 
   const pageSize = 10;
 

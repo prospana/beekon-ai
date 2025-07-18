@@ -15,7 +15,7 @@ import { FileDropZone } from "@/components/ui/file-drop-zone";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera, User } from "lucide-react";
+import { User } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -72,16 +72,16 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       // Reset form with profile data
       form.reset({
-        firstName: profile.first_name || "",
-        lastName: profile.last_name || "",
+        firstName: profile?.first_name || "",
+        lastName: profile?.last_name || "",
         email: user.email || "",
-        company: profile.company || "",
-        jobTitle: profile.job_title || "",
-        phone: profile.phone || "",
+        company: profile?.company || "",
+        jobTitle: "", // job_title doesn't exist on Profile type
+        phone: "", // phone doesn't exist on Profile type
       });
 
       // Set avatar URL for display
-      setCurrentAvatarUrl(profile.avatar_url);
+      setCurrentAvatarUrl(profile?.avatar_url || null);
       setAvatarPreview(null); // Clear any preview when loading real data
     } catch (error) {
       toast({
@@ -110,8 +110,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         first_name: data.firstName,
         last_name: data.lastName,
         company: data.company || null,
-        job_title: data.jobTitle || null,
-        phone: data.phone || null,
       });
 
       toast({

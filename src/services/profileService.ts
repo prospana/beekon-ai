@@ -11,9 +11,9 @@ import BaseService from "./baseService";
 export interface ProfileUpdateData {
   first_name?: string;
   last_name?: string;
-  company?: string;
+  company?: string | null;
   full_name?: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
 }
 
 export interface NotificationUpdateData {
