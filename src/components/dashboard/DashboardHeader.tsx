@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { ExportDropdown } from "@/components/ui/export-components";
-import { DashboardMetrics } from "@/hooks/useDashboard";
+import { type DashboardMetrics } from "@/types/database";
 import { Workspace } from "@/types/database";
 import { ExportFormat } from "@/lib/export-utils";
 import { RefreshCw } from "lucide-react";
@@ -17,7 +17,7 @@ interface DashboardHeaderProps {
   isExporting: boolean;
   hasData: boolean;
   refreshData: () => void;
-  handleExportData: (format: ExportFormat) => void;
+  handleExportData: (format: ExportFormat) => Promise<void>;
 }
 
 export function DashboardHeader({

@@ -20,6 +20,7 @@ import NoAnalyticsState from "@/components/competitors/NoAnalyticsState";
 import CompetitorInsights from "@/components/competitors/CompetitorInsights";
 import { sendN8nWebhook } from "@/lib/http-request";
 import { addProtocol } from "@/lib/utils";
+import { ExportFormat } from "@/lib/export-utils";
 
 export default function Competitors() {
   const {
@@ -92,9 +93,81 @@ export default function Competitors() {
   // Compatibility functions for existing code
   const refreshData = refetch || (() => {});
   const clearError = () => {}; // Errors clear automatically in React Query
-  const exportCompetitorData = async (format: "pdf" | "csv" | "json") => {
-    // TODO: Implement export functionality
-    console.log("Export functionality to be implemented", format);
+  
+  // Export functionality
+  const exportCompetitorData = async (format: ExportFormat) => {
+    if (!targetWebsiteId) {
+      toast({
+        title: "Export Error",
+        description: "No website selected for export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const { exportService } = await import("@/services/exportService");
+      
+      // Prepare export data with enhanced competitor information
+      const exportData = competitorsWithStatus.map(competitor => ({
+        ...competitor,
+        performance: competitor.performance || {},
+        // Add calculated fields
+        performanceScore: competitor.performance?.shareOfVoice || 0,
+        statusText: competitor.analysisStatus,
+        addedDate: competitor.addedAt,
+        isActive: competitor.is_active,
+        // Remove unnecessary fields
+        id: undefined,
+        website_id: undefined,
+        created_at: undefined,
+        updated_at: undefined,
+      })).filter(item => item); // Remove undefined items
+
+      // Create export content
+      const exportContent = {
+        title: `Competitor Analysis Report`,
+        data: exportData,
+        exportedAt: new Date().toISOString(),
+        totalRecords: exportData.length,
+        filters: {
+          dateRange: `${dateFilter} days`,
+          sortBy: sortBy,
+          websiteId: targetWebsiteId,
+        },
+        dateRange,
+        dataType: "competitor", // Use competitor field mapping
+        metadata: {
+          exportType: "competitor_analysis",
+          generatedBy: "Beekon AI Export Service",
+          websiteId: targetWebsiteId,
+          totalCompetitors: exportData.length,
+          activeCompetitors: exportData.filter(c => c.isActive).length,
+        },
+      };
+
+      const blob = await exportService.exportData(exportContent, format, { 
+        exportType: "competitor", 
+        customFilename: `competitor_analysis_${dateFilter}` 
+      });
+
+      // Success toast will be shown by the export service
+      toast({
+        title: "Export Successful",
+        description: `Competitor data exported as ${format.toUpperCase()}`,
+      });
+
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Prepare chart data from analytics (memoized to prevent unnecessary recalculations)

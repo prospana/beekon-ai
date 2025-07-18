@@ -10,9 +10,27 @@ import BaseService from "./baseService";
 import {
   competitorAnalysisService,
   type CompetitorShareOfVoice,
-  type CompetitiveGapAnalysis,
   type CompetitorInsight,
 } from "./competitorAnalysisService";
+
+export interface CompetitiveGapAnalysis {
+  competitorId: string;
+  competitorName: string;
+  marketCompetitiveness: number;
+  yourPerformance: number;
+  marketSize: number;
+  gapScore: number;
+}
+
+export interface Competitor {
+  id: string;
+  website_id: string;
+  competitor_domain: string;
+  competitor_name: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface CompetitorPerformance {
   competitorId: string;

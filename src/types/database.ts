@@ -35,17 +35,17 @@ export type PromptInsert =
 export type PromptUpdate =
   Database["beekon_data"]["Tables"]["prompts"]["Update"];
 
-export type Profile = Database["beekon_data"]["Tables"]["profiles"]["Row"];
+export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProfileInsert =
-  Database["beekon_data"]["Tables"]["profiles"]["Insert"];
+  Database["public"]["Tables"]["profiles"]["Insert"];
 export type ProfileUpdate =
-  Database["beekon_data"]["Tables"]["profiles"]["Update"];
+  Database["public"]["Tables"]["profiles"]["Update"];
 
-export type ApiKey = Database["beekon_data"]["Tables"]["api_keys"]["Row"];
+export type ApiKey = Database["public"]["Tables"]["api_keys"]["Row"];
 export type ApiKeyInsert =
-  Database["beekon_data"]["Tables"]["api_keys"]["Insert"];
+  Database["public"]["Tables"]["api_keys"]["Insert"];
 export type ApiKeyUpdate =
-  Database["beekon_data"]["Tables"]["api_keys"]["Update"];
+  Database["public"]["Tables"]["api_keys"]["Update"];
 
 export type WebsiteSettings =
   Database["beekon_data"]["Tables"]["website_settings"]["Row"];
@@ -142,6 +142,10 @@ export interface UIAnalysisResult {
   prompt_opportunities: string[] | null;
   llm_results: UILLMResult[];
   insights?: AnalysisInsights;
+  // Analysis session information
+  analysis_session_id?: string | null;
+  analysis_name?: string | null;
+  analysis_session_status?: string | null;
 }
 
 // UI-specific LLM result format

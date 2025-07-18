@@ -10,23 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   History, 
-  Download, 
   RefreshCw, 
   Trash2, 
-  Calendar, 
-  Search,
   FileText,
   AlertCircle,
   CheckCircle,
   Clock,
-  Filter,
   MoreHorizontal,
   Archive,
   TrendingUp,
@@ -63,7 +56,7 @@ export function ExportHistoryModal({
 }: ExportHistoryModalProps) {
   const [exportHistory, setExportHistory] = useState<ExportHistoryRecord[]>([]);
   const [exportSummary, setExportSummary] = useState<UserExportSummary | null>(null);
-  const [exportStats, setExportStats] = useState<ExportStatistics[]>([]);
+  const [_exportStats, setExportStats] = useState<ExportStatistics[]>([]);
   const [loading, setLoading] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -74,8 +67,8 @@ export function ExportHistoryModal({
   const [statusFilter, setStatusFilter] = useState<ExportStatus | "all">("all");
   const [typeFilter, setTypeFilter] = useState<ExportType | "all">("all");
   const [formatFilter, setFormatFilter] = useState<ExportFormat | "all">("all");
-  const [sortBy, setSortBy] = useState<"created_at" | "updated_at" | "file_size">("created_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [_sortBy, _setSortBy] = useState<"created_at" | "updated_at" | "file_size">("created_at");
+  const [_sortOrder, _setSortOrder] = useState<"asc" | "desc">("desc");
 
   const pageSize = 10;
 
@@ -97,8 +90,8 @@ export function ExportHistoryModal({
       const options: ExportHistoryOptions = {
         limit: pageSize,
         offset: page * pageSize,
-        sort_by: sortBy,
-        sort_order: sortOrder,
+        sort_by: "created_at",
+        sort_order: "desc",
       };
 
       const [historyResult, summary, stats] = await Promise.all([
@@ -122,7 +115,7 @@ export function ExportHistoryModal({
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter, typeFilter, formatFilter, sortBy, sortOrder]);
+  }, [searchTerm, statusFilter, typeFilter, formatFilter]);
 
   const handleRetryExport = async (id: string) => {
     setRetryingId(id);
@@ -234,7 +227,7 @@ export function ExportHistoryModal({
     if (modalOpen || isOpen) {
       fetchExportHistory(0);
     }
-  }, [modalOpen, isOpen, searchTerm, statusFilter, typeFilter, formatFilter, sortBy, sortOrder, fetchExportHistory]);
+  }, [modalOpen, isOpen, searchTerm, statusFilter, typeFilter, formatFilter, fetchExportHistory]);
 
   const ExportHistoryContent = () => (
     <div className="space-y-4">
@@ -402,10 +395,12 @@ export function ExportHistoryModal({
                       )}
                     </div>
                     {record.error_message && (
-                      <Alert className="mt-2">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{record.error_message}</AlertDescription>
-                      </Alert>
+                      <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded text-sm text-destructive">
+                        <div className="flex">
+                          <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                          <span>{record.error_message}</span>
+                        </div>
+                      </div>
                     )}
                   </div>
                   <DropdownMenu>

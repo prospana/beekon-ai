@@ -20,7 +20,8 @@ const sha256 = async (data: string): Promise<string> => {
   return arrayBufferToHex(hashBuffer);
 };
 
-// ApiKey is now imported from database types
+// Export ApiKey type for external use
+export type { ApiKey } from "@/types/database";
 
 export interface ApiKeyWithSecret extends Omit<ApiKey, "key_hash"> {
   key: string; // Only available immediately after creation

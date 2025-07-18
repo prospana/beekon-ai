@@ -1,11 +1,11 @@
 import {
   dashboardService,
-  type DashboardMetrics,
   type LLMPerformance,
   type TimeSeriesData,
   type TopicPerformance,
   type WebsitePerformance,
 } from "@/services/dashboardService";
+import { type DashboardMetrics } from "@/types/database";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "./use-toast";
 import { useWorkspace } from "./useWorkspace";
@@ -82,8 +82,7 @@ export function useDashboardMetrics(
           dashboardService.getWebsitePerformance(websiteIds),
         ]);
 
-        setState((prev) => ({
-          ...prev,
+        setState(() => ({
           metrics,
           timeSeriesData,
           topicPerformance,

@@ -46,7 +46,7 @@ export function ContextualEmptyState({
     }
 
     if (hasFilters) {
-      const filterCount = Object.values(activeFilters).filter(Boolean).length;
+      // const _filterCount = Object.values(activeFilters).filter(Boolean).length;
       const filterDescriptions = [];
       
       if (activeFilters.topic && activeFilters.topic !== "all") {

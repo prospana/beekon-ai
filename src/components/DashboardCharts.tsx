@@ -32,11 +32,11 @@ interface LLMPerformanceChartProps {
 }
 
 export const LLMPerformanceChart = React.memo(({ llmData }: LLMPerformanceChartProps) => {
-  const colors = {
-    ChatGPT: "#10B981", // green
-    Claude: "#F59E0B", // orange  
-    Gemini: "#3B82F6", // blue
-  };
+  // const _colors = {
+  //   ChatGPT: "#10B981", // green
+  //   Claude: "#F59E0B", // orange  
+  //   Gemini: "#3B82F6", // blue
+  // };
 
   return (
     <Card>
@@ -94,7 +94,7 @@ export const WebsitePerformanceChart = React.memo(({ websiteData }: WebsitePerfo
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {topWebsites.map((website, index) => (
+          {topWebsites.map((website, _index) => (
             <div key={website.websiteId} className="space-y-2">
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-2">
@@ -148,7 +148,7 @@ export const SentimentDistributionChart = React.memo(({ sentimentData }: Sentime
               fill="#8884d8"
               dataKey="value"
             >
-              {sentimentData.map((entry, index) => (
+              {sentimentData.map((_entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
