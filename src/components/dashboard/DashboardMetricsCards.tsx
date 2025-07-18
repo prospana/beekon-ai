@@ -4,7 +4,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { DashboardMetrics } from "@/hooks/useDashboard";
+import { type DashboardMetrics } from "@/types/database";
 import {
   BarChart3,
   ExternalLink,

@@ -40,9 +40,9 @@ interface DisplayApiKey {
   id: string;
   name: string;
   key: string;
-  created: string;
+  created: string | null;
   lastUsed: string;
-  requests: number;
+  requests: number | null;
   status: "active" | "revoked";
 }
 
@@ -125,9 +125,9 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
         id: newKeyWithSecret.id,
         name: newKeyWithSecret.name,
         key: newKeyWithSecret.key, // Show full key only for newly generated keys
-        created: newKeyWithSecret.created_at,
+        created: newKeyWithSecret.created_at || null,
         lastUsed: newKeyWithSecret.last_used_at || 'Never',
-        requests: newKeyWithSecret.usage_count,
+        requests: newKeyWithSecret.usage_count || null,
         status: newKeyWithSecret.is_active ? 'active' : 'revoked',
       };
 
@@ -375,14 +375,14 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
                       <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-1">
                           <Calendar className="h-3 w-3" />
-                          <span>Created: {new Date(apiKey.created).toLocaleDateString()}</span>
+                          <span>Created: {apiKey.created ? new Date(apiKey.created).toLocaleDateString() : 'Unknown'}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Activity className="h-3 w-3" />
                           <span>Last used: {apiKey.lastUsed}</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <span>Requests: {apiKey.requests.toLocaleString()}</span>
+                          <span>Requests: {apiKey.requests?.toLocaleString() || 0}</span>
                         </div>
                       </div>
                     </div>

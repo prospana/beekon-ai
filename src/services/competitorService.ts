@@ -22,6 +22,16 @@ export interface CompetitiveGapAnalysis {
   gapScore: number;
 }
 
+export interface Competitor {
+  id: string;
+  website_id: string;
+  competitor_domain: string;
+  competitor_name: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CompetitorPerformance {
   competitorId: string;
   domain: string;

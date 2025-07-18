@@ -82,8 +82,7 @@ export function useDashboardMetrics(
           dashboardService.getWebsitePerformance(websiteIds),
         ]);
 
-        setState((prev) => ({
-          ...prev,
+        setState(() => ({
           metrics,
           timeSeriesData,
           topicPerformance,
