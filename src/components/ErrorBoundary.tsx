@@ -27,7 +27,7 @@ interface ErrorFallbackProps {
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  private resetTimeoutId: number | null = null;
+  // private _resetTimeoutId: number | null = null;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -47,7 +47,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({
       errorInfo,
     });
@@ -61,7 +61,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
   }
 
-  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+  override componentDidUpdate(prevProps: ErrorBoundaryProps) {
     const { resetOnPropsChange, resetKeys } = this.props;
     const { hasError } = this.state;
 
@@ -86,15 +86,15 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     // In production, you would send this to your error tracking service
     // Example: Sentry, LogRocket, etc.
     try {
-      const errorData = {
-        message: error.message,
-        stack: error.stack,
-        componentStack: errorInfo.componentStack,
-        errorId: this.state.errorId,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-      };
+      // const _errorData = {
+      //   message: error.message,
+      //   stack: error.stack,
+      //   componentStack: errorInfo.componentStack,
+      //   errorId: this.state.errorId,
+      //   timestamp: new Date().toISOString(),
+      //   userAgent: navigator.userAgent,
+      //   url: window.location.href,
+      // };
 
       // Send to error tracking service
       // errorTrackingService.captureException(errorData);
@@ -112,7 +112,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     });
   };
 
-  render() {
+  override render() {
     const { hasError, error, errorInfo, errorId } = this.state;
     const { children, fallback: Fallback } = this.props;
 
@@ -261,7 +261,7 @@ export function withErrorBoundary<T extends React.ComponentType<any>>(
     React.ComponentProps<T>
   >((props, ref) => (
     <ErrorBoundary fallback={errorFallback}>
-      <Component {...props} ref={ref} />
+      <Component {...(props as any)} ref={ref} />
     </ErrorBoundary>
   ));
 

@@ -13,10 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { apiKeyService, ApiKey as ApiKeyType, ApiKeyUsage } from "@/services/apiKeyService";
+import { apiKeyService, ApiKeyUsage } from "@/services/apiKeyService";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import {
   Key,
@@ -50,7 +50,7 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
   const { toast } = useToast();
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isRevoking, setIsRevoking] = useState(false);
+  const [, setIsRevoking] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showKey, setShowKey] = useState<{ [key: string]: boolean }>({});
   const [newKeyName, setNewKeyName] = useState("");
@@ -424,7 +424,7 @@ export function ApiKeyModal({ isOpen, onClose, onApiKeyChange }: ApiKeyModalProp
           setShowConfirmation(false);
           setKeyToRevoke(null);
         }}
-        onConfirm={() => keyToRevoke && handleRevokeKey(keyToRevoke)}
+        onConfirm={() => keyToRevoke ? handleRevokeKey(keyToRevoke) : Promise.resolve()}
         title="Revoke API Key"
         description="Are you sure you want to revoke this API key? This action cannot be undone and will immediately stop all requests using this key."
         confirmText="Revoke Key"
